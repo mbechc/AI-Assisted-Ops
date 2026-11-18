@@ -20,6 +20,16 @@ def load_mock(release: str):
     return importlib.reload(mockcc.app)
 
 
+@pytest.fixture(autouse=True)
+def _release_db():
+    """Tests leave sessions open; on PostgreSQL their locks would block the next test's drop_all."""
+    yield
+    from sqlalchemy.orm import close_all_sessions
+    from app.db import engine
+    close_all_sessions()
+    engine.dispose()
+
+
 @pytest.fixture(params=RELEASES)
 def mock_cc(request):
     return load_mock(request.param)
