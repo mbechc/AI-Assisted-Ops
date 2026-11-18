@@ -343,7 +343,7 @@ main() {
   local ips
   ips="$(hostname -I 2>/dev/null | tr ' ' '\n' | grep -E '^[0-9.]+$' | sed 's/^/--ip /' | tr '\n' ' ')"
   # shellcheck disable=SC2086
-  compose run --rm --no-deps --user 0 -v "$INSTALL_DIR/certs:/certs:z" api manage gen-cert \
+  compose run --rm -T --no-deps --user 0 -v "$INSTALL_DIR/certs:/certs:z" api manage gen-cert \
     --hostname "$(env_get AIOPS_HOSTNAME)" $ips --out /certs
 
   c_info "Starting database, queue and local LLM"
@@ -354,12 +354,12 @@ main() {
   pull_model
 
   c_info "Database migrations"
-  compose run --rm api migrate
-  compose run --rm api manage bootstrap
+  compose run --rm -T api migrate
+  compose run --rm -T api manage bootstrap
 
   local admin_out=""
   if [ -n "$ADMIN_PASSWORD" ]; then
-    compose run --rm api manage create-admin --username admin --password "$ADMIN_PASSWORD" --reset >/dev/null
+    compose run --rm -T api manage create-admin --username admin --password "$ADMIN_PASSWORD" --reset >/dev/null
     admin_out="$ADMIN_PASSWORD"
   else
     admin_out="$(compose run --rm -T api manage create-admin --username admin --print-password | tail -1)"
@@ -372,7 +372,7 @@ main() {
     wait_healthy "$svc" 300 || { compose logs --tail 50 "$svc"; die "$svc did not become healthy"; }
   done
   if [ "$(env_get COMPOSE_PROFILES)" = "mock" ]; then
-    compose run --rm api manage add-mock-sources
+    compose run --rm -T api manage add-mock-sources
   fi
 
   local hc_args=""

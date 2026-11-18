@@ -24,6 +24,6 @@ if [ "$migrate" = 0 ]; then
   c_ok "Database restored; application stopped. Now install the matching release."
   exit 0
 fi
-compose run --rm api migrate
+compose run --rm -T api migrate
 compose up -d
 c_ok "Database restored"

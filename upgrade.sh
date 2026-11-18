@@ -14,6 +14,10 @@ done
 export INSTALL_DIR
 [ -f "$INSTALL_DIR/.env" ] || die "no installation found in $INSTALL_DIR (use install.sh)"
 
-c_info "Backing up current installation"
-"$INSTALL_DIR/scripts/backup.sh"
+if [ -n "$(compose ps -q --status running postgres 2>/dev/null)" ]; then
+  c_info "Backing up current installation"
+  "$INSTALL_DIR/scripts/backup.sh"
+else
+  c_warn "Database is not running (earlier install did not finish?): no backup taken"
+fi
 exec "$SRC_DIR/install.sh" --yes "$@"
