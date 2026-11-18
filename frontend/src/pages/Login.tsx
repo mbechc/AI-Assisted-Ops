@@ -1,0 +1,42 @@
+import { FormEvent, useState } from "react";
+import { api } from "../api";
+import { User } from "../types";
+
+export default function Login({ onLogin }: { onLogin: (u: User) => void }) {
+  const [username, setUsername] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+
+  const submit = async (e: FormEvent) => {
+    e.preventDefault();
+    setBusy(true);
+    setError(null);
+    try {
+      onLogin(await api.post<User>("/auth/login", { username, password }));
+    } catch (err: any) {
+      setError(err.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  return (
+    <div className="login card">
+      <h1>AIOps</h1>
+      <p className="sub" style={{ marginBottom: 16 }}>Sign in to review and automate operational tasks.</p>
+      <form onSubmit={submit}>
+        <label className="field">
+          Username
+          <input autoFocus value={username} onChange={(e) => setUsername(e.target.value)} />
+        </label>
+        <label className="field">
+          Password
+          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+        </label>
+        {error && <p className="err">{error}</p>}
+        <button className="primary" disabled={busy || !username || !password} type="submit">Sign in</button>
+      </form>
+    </div>
+  );
+}

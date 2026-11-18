@@ -1,0 +1,19 @@
+#!/usr/bin/env bash
+# Upgrade an existing installation from this (newer) package: backup first, then re-run the
+# idempotent installer, which keeps configuration, certificates, data, model and users.
+# Accepts the same options as install.sh.
+set -euo pipefail
+SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+. "$SRC_DIR/scripts/lib.sh"
+require_root
+
+args=("$@")
+for ((i = 0; i < ${#args[@]}; i++)); do
+  [ "${args[$i]}" = "--install-dir" ] && INSTALL_DIR="${args[$((i + 1))]:-$INSTALL_DIR}"
+done
+export INSTALL_DIR
+[ -f "$INSTALL_DIR/.env" ] || die "no installation found in $INSTALL_DIR (use install.sh)"
+
+c_info "Backing up current installation"
+"$INSTALL_DIR/scripts/backup.sh"
+exec "$SRC_DIR/install.sh" --yes "$@"
