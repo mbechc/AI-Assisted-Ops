@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# CiscoAIOps installer. Idempotent: re-running it from a newer package upgrades in place
+# AIOps installer. Idempotent: re-running it from a newer package upgrades in place
 # (keeps .env, certificates, database, model and users).
 set -eEuo pipefail
 on_error() {
@@ -21,6 +21,8 @@ MODEL=""
 HTTPS_PORT_ARG=""
 HTTP_PORT_ARG=""
 WITH_MOCK=0
+BUILD_LOCAL=0
+CHANNEL=""
 OFFLINE_BUNDLE=""
 SKIP_DOCKER_INSTALL=0
 SKIP_MODEL=0
@@ -30,13 +32,15 @@ usage() {
   cat <<EOF
 Usage: sudo ./install.sh [options]
 
-  --install-dir DIR       Installation directory (default /opt/CiscoAIOps)
+  --install-dir DIR       Installation directory (default /opt/AIOps)
+  --channel TRACK         Update track: production (default) or development
   --hostname NAME         Hostname for the TLS certificate (default: this host's FQDN)
   --admin-password PW     Initial admin password (default: generated and shown once)
   --model TAG             Ollama model (default qwen2.5:7b-instruct)
   --https-port N          HTTPS port (default 443)
   --http-port N           HTTP port, redirects to HTTPS (default 80)
   --with-mock             Also run simulated Catalyst Center 2.3/3.1 for testing
+  --build                 Build the images locally instead of pulling them from ghcr.io (development)
   --offline-bundle FILE   Install from an offline bundle (no Internet needed; Docker must be installed)
   --skip-docker-install   Never install Docker (fail if missing)
   --skip-model            Do not pull the LLM model (system runs with rule-based confidence only)
@@ -53,6 +57,10 @@ while [ $# -gt 0 ]; do
     --https-port) HTTPS_PORT_ARG="$2"; shift 2 ;;
     --http-port) HTTP_PORT_ARG="$2"; shift 2 ;;
     --with-mock) WITH_MOCK=1; shift ;;
+    --build) BUILD_LOCAL=1; shift ;;
+    --channel)
+      case "$2" in production|development) CHANNEL="$2" ;; *) die "--channel must be production or development" ;; esac
+      shift 2 ;;
     --offline-bundle) OFFLINE_BUNDLE="$(cd "$(dirname "$2")" && pwd)/$(basename "$2")"; shift 2 ;;
     --skip-docker-install) SKIP_DOCKER_INSTALL=1; shift ;;
     --skip-model) SKIP_MODEL=1; shift ;;
@@ -140,12 +148,15 @@ preflight() {
   mkdir -p "$root"
   disk_gb=$(( $(df -Pk "$root" | awk 'NR==2 {print $4}') / 1024 / 1024 ))
 
+  # Hard floor: below this the stack cannot run at all. The supported size is in README.md.
   [ "$cores" -ge 4 ] || die "at least 4 CPU cores required (found $cores)"
-  [ "$cores" -ge 8 ] && c_ok "CPU cores: $cores" || c_warn "CPU cores: $cores (8+ recommended for the local LLM)"
   [ "$mem_gb" -ge 15 ] || die "at least 16 GB RAM required (found ${mem_gb} GB)"
-  [ "$mem_gb" -ge 30 ] && c_ok "Memory: ${mem_gb} GB" || c_warn "Memory: ${mem_gb} GB (32 GB recommended)"
   [ "$disk_gb" -ge 20 ] || die "at least 20 GB free disk in $root required (found ${disk_gb} GB)"
-  c_ok "Free disk in $root: ${disk_gb} GB"
+  [ "$cores" -ge 16 ] && c_ok "CPU cores: $cores" || c_warn "CPU cores: $cores (requirement: 16 vCPU, see README.md)"
+  # MemTotal is reported slightly below the installed size.
+  [ "$mem_gb" -ge 60 ] && c_ok "Memory: ${mem_gb} GB" || c_warn "Memory: ${mem_gb} GB (requirement: 64 GB, see README.md)"
+  [ "$disk_gb" -ge 200 ] && c_ok "Free disk in $root: ${disk_gb} GB" \
+    || c_warn "Free disk in $root: ${disk_gb} GB (requirement: 200 GB, see README.md)"
 
   local running_web=""
   [ -f "$INSTALL_DIR/docker-compose.yml" ] && [ -f "$INSTALL_DIR/.env" ] && running_web="$(compose ps -q web 2>/dev/null || true)"
@@ -167,7 +178,8 @@ stage_files() {
       --exclude=./dist --exclude=./frontend/node_modules --exclude=./frontend/dist -cf - .) \
       | (cd "$INSTALL_DIR" && tar --no-same-owner -xf -)
   fi
-  mkdir -p "$INSTALL_DIR/certs" "$INSTALL_DIR/data/fixtures" "$INSTALL_DIR/data/geoip" "$INSTALL_DIR/backups"
+  mkdir -p "$INSTALL_DIR/certs" "$INSTALL_DIR/data/fixtures" "$INSTALL_DIR/data/geoip" "$INSTALL_DIR/data/update/requests" \
+    "$INSTALL_DIR/backups"
   find "$INSTALL_DIR" -path "$INSTALL_DIR/data" -prune -o ! -user root -exec chown root:root {} +
   chmod go-w "$INSTALL_DIR"
   chown -R 10001:10001 "$INSTALL_DIR/data"
@@ -186,8 +198,15 @@ configure_env() {
     env_set FERNET_KEY "$(fernet_key)"
     env_set AIOPS_HOSTNAME "${HOSTNAME_ARG:-$(hostname -f 2>/dev/null || hostname)}"
     env_set TZ "$(timedatectl show -p Timezone --value 2>/dev/null || echo UTC)"
+    env_set COMPOSE_PROJECT_NAME aiops
   fi
   chmod 600 "$env"
+  # project_name() falls back to the pre-rename name for an .env without it; make that explicit.
+  [ -n "$(env_get COMPOSE_PROJECT_NAME)" ] || env_set COMPOSE_PROJECT_NAME "$(project_name)"
+  [ -n "$(env_get AIOPS_UPDATE_REPO)" ] || env_set AIOPS_UPDATE_REPO "$GITHUB_REPO"
+  [ -n "$(env_get AIOPS_UPDATE_CHANNEL)" ] || env_set AIOPS_UPDATE_CHANNEL production
+  [ -n "$CHANNEL" ] && env_set AIOPS_UPDATE_CHANNEL "$CHANNEL"
+  [ -n "$(env_get AIOPS_IMAGE_PREFIX)" ] || env_set AIOPS_IMAGE_PREFIX "ghcr.io/$(echo "${GITHUB_REPO%%/*}" | tr '[:upper:]' '[:lower:]')/aiops"
   env_set AIOPS_VERSION "$VERSION"
   [ -n "$HOSTNAME_ARG" ] && env_set AIOPS_HOSTNAME "$HOSTNAME_ARG"
   [ -n "$MODEL" ] && env_set OLLAMA_MODEL "$MODEL"
@@ -212,6 +231,45 @@ open_firewall() {
   fi
 }
 
+# ------------------------------------------------------------------ host updater
+
+# The portal drops request files into data/update/requests; this path unit runs scripts/update.sh
+# on the host. Containers never get the Docker socket or root for updates.
+install_updater() {
+  if [ ! -d /run/systemd/system ]; then
+    c_warn "systemd not found: in-portal updates and the Dashboard internet status are unavailable"
+    return
+  fi
+  mkdir -p "$INSTALL_DIR/data/update/requests"
+  chown -R 10001:10001 "$INSTALL_DIR/data/update"
+  cat >/etc/systemd/system/aiops-updater.service <<EOF
+[Unit]
+Description=AIOps updater (GitHub reachability, release lookup, updates)
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=$INSTALL_DIR/scripts/update.sh --process
+TimeoutStartSec=3h
+EOF
+  cat >/etc/systemd/system/aiops-updater.path <<EOF
+[Unit]
+Description=AIOps updater: requests from the portal
+
+[Path]
+DirectoryNotEmpty=$INSTALL_DIR/data/update/requests
+
+[Install]
+WantedBy=multi-user.target
+EOF
+  systemctl daemon-reload
+  systemctl enable aiops-updater.path >/dev/null 2>&1
+  systemctl restart aiops-updater.path
+  touch "$INSTALL_DIR/data/update/requests/$(date +%s%N)-check"
+  c_ok "Host updater: aiops-updater.path (systemd)"
+}
+
 # ------------------------------------------------------------------ images + model
 
 load_offline_bundle() {
@@ -221,8 +279,8 @@ load_offline_bundle() {
   tar -xf "$OFFLINE_BUNDLE" -C "$tmp"
   docker load -i "$tmp/images.tar"
   if [ -f "$tmp/ollama-models.tgz" ]; then
-    docker volume create ciscoaiops_ollama >/dev/null
-    docker run --rm -v ciscoaiops_ollama:/root/.ollama -v "$tmp":/in --entrypoint tar ollama/ollama:0.40.16 \
+    docker volume create "$(project_name)_ollama" >/dev/null
+    docker run --rm -v "$(project_name)_ollama":/root/.ollama -v "$tmp":/in --entrypoint tar ollama/ollama:0.40.16 \
       xzf /in/ollama-models.tgz -C /root/.ollama
     c_ok "LLM model restored from bundle"
   fi
@@ -230,10 +288,16 @@ load_offline_bundle() {
 }
 
 build_images() {
-  c_info "Pulling base images and building CiscoAIOps $VERSION (needs Internet, one time)"
+  c_info "Pulling base images and building AIOps $VERSION locally"
   # Pull every image that is not built locally (compose < 2.22 lacks --ignore-buildable).
   compose pull --ignore-buildable 2>/dev/null || compose pull postgres redis ollama logproxy
   compose build --pull
+}
+
+# Prebuilt images from ghcr.io; on upgrades only changed layers are downloaded.
+pull_images() {
+  c_info "Pulling AIOps $VERSION images ($(env_get AIOPS_IMAGE_PREFIX)-backend, -web) and base images"
+  compose pull --quiet || die "image pull failed: check Internet/proxy access to ghcr.io (or use --build)"
 }
 
 pull_model() {
@@ -251,7 +315,7 @@ pull_model() {
 
 main() {
   require_root
-  c_info "CiscoAIOps $VERSION installer -> $INSTALL_DIR"
+  c_info "AIOps $VERSION installer -> $INSTALL_DIR"
   detect_os
   ensure_docker
   HTTPS_PORT="${HTTPS_PORT_ARG:-443}"
@@ -262,15 +326,18 @@ main() {
   preflight
 
   if [ "$ASSUME_YES" != 1 ] && [ -t 0 ]; then
-    read -r -p "Install CiscoAIOps $VERSION into $INSTALL_DIR? [Y/n] " ans
+    read -r -p "Install AIOps $VERSION into $INSTALL_DIR? [Y/n] " ans
     case "${ans:-y}" in y|Y|yes) ;; *) die "aborted" ;; esac
   fi
 
   stage_files
   configure_env
   open_firewall
+  install_updater
 
-  if [ -n "$OFFLINE_BUNDLE" ]; then load_offline_bundle; else build_images; fi
+  if [ -n "$OFFLINE_BUNDLE" ]; then load_offline_bundle
+  elif [ "$BUILD_LOCAL" = 1 ]; then build_images
+  else pull_images; fi
 
   c_info "TLS certificate"
   local ips
@@ -316,7 +383,7 @@ main() {
   "$INSTALL_DIR/scripts/healthcheck.sh" $hc_args || die "post-install self-test failed"
 
   echo
-  c_ok "CiscoAIOps $VERSION is installed and running."
+  c_ok "AIOps $VERSION is installed and running."
   echo "    URL:   https://$(env_get AIOPS_HOSTNAME):${HTTPS_PORT}/"
   if [ -n "$admin_out" ]; then
     umask 077
@@ -326,7 +393,7 @@ main() {
   else
     echo "    Login: existing users unchanged"
   fi
-  echo "    From here on the system needs no Internet access."
+  echo "    Updates: Settings > Updates (track: $(env_get AIOPS_UPDATE_CHANNEL)). Internet access is only needed for updates."
 }
 
 main "$@"

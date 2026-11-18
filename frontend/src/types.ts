@@ -181,3 +181,47 @@ export interface RunnersOverview {
   schedule: { task_key: string; name: string; worker: string; cron: string; enabled: boolean; next: string[];
     last_run: { id: number; status: string; created_at: string; finished_at: string | null } | null }[];
 }
+
+export interface Endpoint {
+  host: string;
+  ok: boolean;
+  ms: number;
+  error: string | null;
+}
+
+export interface Connectivity {
+  status: "connected" | "airgapped" | "unknown";
+  checked_at: string | null;
+  endpoints: Endpoint[];
+  failed: string[];
+  reason: string | null;
+  interval_min: number;
+}
+
+export interface Release {
+  version: string;
+  tag: string;
+  prerelease: boolean;
+  name: string;
+  published_at: string | null;
+  notes: string;
+  url: string | null;
+}
+
+export interface UpdateState {
+  current_version: string;
+  channel: "production" | "development";
+  channel_pending: string | null;
+  repo: string;
+  connectivity: Connectivity;
+  releases_checked_at: string | null;
+  releases_error: string | null;
+  available: Release | null;
+  install: { state: "running" | "succeeded" | "failed"; version: string | null; started_at: string | null;
+             finished_at: string | null; error: string | null } | null;
+  install_running: boolean;
+  pending: { action: string; age_seconds: number }[];
+  updater_stale: boolean;
+  updater_installed: boolean;
+  can_manage: boolean;
+}

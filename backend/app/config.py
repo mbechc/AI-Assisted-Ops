@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import AliasChoices, Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -29,7 +30,11 @@ class Settings(BaseSettings):
     fixtures_dir: str = "/data/fixtures"
     geoip_dir: str = "/data/geoip"
     logproxy_url: str = "http://logproxy:2375"
-    compose_project: str = "ciscoaiops"
+    update_dir: str = "/data/update"
+    aiops_update_repo: str = "mbechc/AI-Assisted-Ops"
+    aiops_update_channel: str = "production"
+    aiops_connectivity_interval_min: int = 15
+    compose_project: str = Field("aiops", validation_alias=AliasChoices("compose_project_name", "compose_project"))
 
     @property
     def database_url(self) -> str:

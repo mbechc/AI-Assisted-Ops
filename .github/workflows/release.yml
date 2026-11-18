@@ -1,0 +1,99 @@
+name: release
+
+# vX.Y.Z      -> Production release
+# vX.Y.Z-*    -> pre-release, offered only on the Development track
+on:
+  push:
+    tags: ["v*"]
+
+permissions:
+  contents: write
+  packages: write
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  test:
+    uses: ./.github/workflows/ci.yml
+
+  release:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Version
+        id: v
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          file="$(tr -d '[:space:]' < VERSION)"
+          if [ "$tag" != "$file" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match VERSION ($file)"
+            exit 1
+          fi
+          case "$tag" in *-*) pre=true ;; *) pre=false ;; esac
+          owner="$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')"
+          {
+            echo "version=$tag"
+            echo "prerelease=$pre"
+            echo "prefix=ghcr.io/$owner/aiops"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Backend image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./backend
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ steps.v.outputs.prefix }}-backend:${{ steps.v.outputs.version }}
+            ${{ steps.v.outputs.prerelease == 'false' && format('{0}-backend:latest', steps.v.outputs.prefix) || '' }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.version=${{ steps.v.outputs.version }}
+            org.opencontainers.image.title=aiops-backend
+          cache-from: type=gha,scope=backend
+          cache-to: type=gha,scope=backend,mode=max
+
+      - name: Web image
+        uses: docker/build-push-action@v6
+        with:
+          context: ./frontend
+          platforms: linux/amd64
+          push: true
+          tags: |
+            ${{ steps.v.outputs.prefix }}-web:${{ steps.v.outputs.version }}
+            ${{ steps.v.outputs.prerelease == 'false' && format('{0}-web:latest', steps.v.outputs.prefix) || '' }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.version=${{ steps.v.outputs.version }}
+            org.opencontainers.image.title=aiops-web
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,scope=web,mode=max
+
+      - name: Release package
+        run: |
+          make release
+          cd dist
+          sha256sum "aiops-${{ steps.v.outputs.version }}.tar.gz" > SHA256SUMS
+          cat SHA256SUMS
+
+      - name: GitHub Release
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          v="${{ steps.v.outputs.version }}"
+          flags="--latest"
+          [ "${{ steps.v.outputs.prerelease }}" = "true" ] && flags="--prerelease --latest=false"
+          # shellcheck disable=SC2086
+          gh release create "$GITHUB_REF_NAME" "dist/aiops-$v.tar.gz" dist/SHA256SUMS \
+            --title "AIOps $v" --generate-notes $flags

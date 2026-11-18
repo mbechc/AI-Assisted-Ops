@@ -1,6 +1,7 @@
-# Shared helpers for CiscoAIOps scripts. Source, do not execute.
+# Shared helpers for AIOps scripts. Source, do not execute.
 
-INSTALL_DIR="${INSTALL_DIR:-/opt/CiscoAIOps}"
+INSTALL_DIR="${INSTALL_DIR:-/opt/AIOps}"
+GITHUB_REPO="${GITHUB_REPO:-mbechc/AI-Assisted-Ops}"
 
 c_info() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 c_ok()   { printf '\033[1;32m[ OK ]\033[0m %s\n' "$*"; }
@@ -12,12 +13,21 @@ require_root() {
   [ "$(id -u)" -eq 0 ] || die "run as root (sudo $0 ...)"
 }
 
-compose() {
-  docker compose --project-directory "$INSTALL_DIR" -f "$INSTALL_DIR/docker-compose.yml" --env-file "$INSTALL_DIR/.env" "$@"
+env_get() {
+  { grep -E "^$1=" "$INSTALL_DIR/.env" 2>/dev/null || true; } | tail -1 | cut -d= -f2-
 }
 
-env_get() {
-  grep -E "^$1=" "$INSTALL_DIR/.env" 2>/dev/null | tail -1 | cut -d= -f2-
+# Installs from before the rename keep their project name (and with it their volumes) via .env.
+project_name() {
+  local p
+  p="$(env_get COMPOSE_PROJECT_NAME)"
+  if [ -z "$p" ] && [ -f "$INSTALL_DIR/.env" ]; then p=ciscoaiops; fi
+  echo "${p:-aiops}"
+}
+
+compose() {
+  docker compose -p "$(project_name)" --project-directory "$INSTALL_DIR" -f "$INSTALL_DIR/docker-compose.yml" \
+    --env-file "$INSTALL_DIR/.env" "$@"
 }
 
 env_set() {

@@ -1,12 +1,17 @@
 import { useEffect, useRef, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "./App";
 import { api } from "./api";
-import { Modal } from "./components";
+import { Modal, useAsync } from "./components";
 import { applyTheme, Theme } from "./theme";
-import { User } from "./types";
+import { UpdateState, User } from "./types";
 
 export default function UserMenu() {
-  const { user, logout, setUser } = useAuth();
+  const { user, logout, setUser, can } = useAuth();
+  const admin = can("admin");
+  const upd = useAsync(() => (admin ? api.get<UpdateState>("/updates") : Promise.resolve(null)), [admin], 300000);
+  const update = upd.data?.available;
+  const nav = useNavigate();
   const [open, setOpen] = useState(false);
   const [pwOpen, setPwOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -47,12 +52,18 @@ export default function UserMenu() {
             ))}
           </div>
           <div className="sep" />
+          {update && (
+            <button className="item" role="menuitem" onClick={() => { setOpen(false); nav("/settings#updates"); }}>
+              Update available: {update.version}
+            </button>
+          )}
           <button className="item" role="menuitem" onClick={() => { setOpen(false); setPwOpen(true); }}>Change password</button>
           <button className="item danger" role="menuitem" onClick={logout}>Log out</button>
         </div>
       )}
       <button className={`user-btn ${open ? "open" : ""}`} onClick={() => setOpen(!open)} aria-haspopup="menu" aria-expanded={open}>
-        <span className="avatar">{user.username.slice(0, 1).toUpperCase()}</span>
+        <span className="avatar">{user.username.slice(0, 1).toUpperCase()}
+          {update && <span className="update-dot" title={`Update ${update.version} available`} />}</span>
         <span className="who"><b>{user.username}</b><span>{user.role}</span></span>
         <span className="caret">{open ? "▼" : "▲"}</span>
       </button>

@@ -382,7 +382,7 @@ def _tag_id(http: CCHttp, tag_name: str, create: bool) -> str | None:
     if not create:
         return None
     http.request("POST", "/dna/intent/api/v1/tag",
-                 json={"name": tag_name, "description": "Excluded from assurance by CiscoAIOps", "systemTag": False})
+                 json={"name": tag_name, "description": "Excluded from assurance by AIOps", "systemTag": False})
     for _ in range(10):
         body = http.get("/dna/intent/api/v1/tag", {"name": tag_name})
         for it in (body or {}).get("response") or []:

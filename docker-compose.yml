@@ -1,4 +1,4 @@
-name: ciscoaiops
+name: aiops
 
 x-backend-env: &backend-env
   DATABASE_HOST: postgres
@@ -13,7 +13,7 @@ x-logging: &logging
     max-file: "5"
 
 x-backend: &backend
-  image: ciscoaiops/backend:${AIOPS_VERSION:-0.2.0}
+  image: ${AIOPS_IMAGE_PREFIX:-ghcr.io/mbechc/aiops}-backend:${AIOPS_VERSION:-0.2.0}
   build:
     context: ./backend
   env_file: .env
@@ -23,6 +23,7 @@ x-backend: &backend
   volumes:
     - ./data/fixtures:/data/fixtures:z
     - ./data/geoip:/data/geoip:z
+    - ./data/update:/data/update:z
   depends_on:
     postgres:
       condition: service_healthy
@@ -177,7 +178,7 @@ services:
       retries: 5
 
   web:
-    image: ciscoaiops/web:${AIOPS_VERSION:-0.2.0}
+    image: ${AIOPS_IMAGE_PREFIX:-ghcr.io/mbechc/aiops}-web:${AIOPS_VERSION:-0.2.0}
     build:
       context: ./frontend
     restart: unless-stopped

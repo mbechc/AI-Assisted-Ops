@@ -1,7 +1,7 @@
 VERSION := $(shell tr -d '[:space:]' < VERSION)
-PKG := ciscoaiops-$(VERSION)
+PKG := aiops-$(VERSION)
 HOST ?= root@aiops-test.example.com
-INSTALL_ARGS ?= --yes
+INSTALL_ARGS ?= --yes --build
 
 .PHONY: release test deploy clean
 
@@ -10,7 +10,7 @@ release:
 	COPYFILE_DISABLE=1 tar -cf - \
 	  --exclude=./.git --exclude=./dist --exclude=./.env --exclude=./certs --exclude=./data --exclude=./backups \
 	  --exclude=node_modules --exclude=./frontend/dist --exclude=__pycache__ --exclude=.pytest_cache \
-	  --exclude=.DS_Store --exclude='._*' --exclude=./initial-admin-password.txt . \
+	  --exclude=.DS_Store --exclude='._*' --exclude='*.whl' --exclude=./.github --exclude=./initial-admin-password.txt . \
 	  | tar -xf - -C dist/stage/$(PKG)
 	chmod +x dist/stage/$(PKG)/install.sh dist/stage/$(PKG)/upgrade.sh dist/stage/$(PKG)/scripts/*.sh
 	COPYFILE_DISABLE=1 tar $(shell tar --version 2>/dev/null | grep -q bsdtar \

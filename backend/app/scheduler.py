@@ -15,6 +15,7 @@ from app.framework import registry
 from app.framework.runner import RunAlreadyActive, create_run, dispatch_approved, ensure_task_configs
 from app.logging_setup import configure_logging
 from app.models import TaskConfig, TaskRun
+from app.updates import schedule_host_checks
 
 log = logging.getLogger("scheduler")
 HEARTBEAT = Path("/tmp/scheduler.heartbeat")
@@ -63,6 +64,11 @@ def main() -> None:
             redis.Redis.from_url(get_settings().redis_url).set("aiops:scheduler:heartbeat", str(time.time()), ex=600)
         except Exception:  # noqa: BLE001
             log.exception("scheduler tick failed")
+        try:
+            for action in schedule_host_checks():
+                log.info("queued host updater request: %s", action)
+        except Exception:  # noqa: BLE001
+            log.exception("host updater scheduling failed")
         time.sleep(TICK_SECONDS)
 
 

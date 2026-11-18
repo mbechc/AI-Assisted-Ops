@@ -1,6 +1,9 @@
 import { useNavigate } from "react-router-dom";
+import { useAuth } from "../App";
 import { api } from "../api";
 import { ErrorLine, useAsync } from "../components";
+import { Connectivity } from "../types";
+import { ConnectivityChip } from "../UpdatesSection";
 
 interface Kpi {
   key: string;
@@ -38,6 +41,8 @@ function Backdrop({ series }: { series: number[] }) {
 
 export default function Dashboard() {
   const kpis = useAsync(() => api.get<Kpi[]>("/items/kpis"), [], 30000);
+  const net = useAsync(() => api.get<Connectivity>("/system/connectivity"), [], 60000);
+  const { can } = useAuth();
   const all = kpis.data || [];
   const nav = useNavigate();
   const open = all.reduce((n, k) => n + k.open, 0);
@@ -53,6 +58,7 @@ export default function Dashboard() {
             24 hours ago. The graph behind each category shows the last 30 days. Click a category to review it.
           </p>
         </div>
+        {net.data && <ConnectivityChip c={net.data} onClick={can("admin") ? () => nav("/settings#updates") : undefined} />}
       </div>
       <ErrorLine error={kpis.error} />
       <div className="kpi-grid">

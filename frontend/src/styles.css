@@ -195,3 +195,18 @@ label.check { display: flex; gap: 6px; align-items: center; }
 .timeline .tick { position: absolute; top: 4px; width: 3px; height: 18px; border-radius: 2px; background: var(--accent); }
 .timeline .now { position: absolute; top: 0; bottom: 0; width: 1px; background: var(--bad); }
 .timeline .hours { display: flex; margin-left: 200px; font-size: 10px; color: var(--muted); }
+
+/* Internet status (Dashboard, Updates) */
+.net-chip { display: inline-flex; align-items: center; gap: 7px; padding: 4px 12px; border-radius: 14px; font-size: 12px;
+  font-weight: 600; border: 1px solid var(--border); background: var(--panel-2); color: var(--muted); white-space: nowrap; }
+.net-chip .dot { width: 8px; height: 8px; border-radius: 50%; background: var(--muted); }
+.net-chip.connected { color: var(--ok); border-color: var(--ok); background: rgba(63, 185, 80, .12); }
+.net-chip.connected .dot { background: var(--ok); }
+.net-chip.unknown { border-style: dashed; }
+.net-chip.link { cursor: pointer; }
+.dot-status { display: inline-block; width: 9px; height: 9px; border-radius: 50%; }
+.dot-status.ok { background: var(--ok); }
+.dot-status.bad { background: var(--bad); }
+.avatar { position: relative; }
+.update-dot { position: absolute; top: -2px; right: -2px; width: 10px; height: 10px; border-radius: 50%;
+  background: var(--warn); border: 2px solid var(--panel); }

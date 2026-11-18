@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useAuth } from "../App";
 import { api } from "../api";
 import { ErrorLine, Level, useAsync } from "../components";
+import UpdatesSection from "../UpdatesSection";
 
 interface GlobalSettings { kill_switch: boolean; global_autonomy_cap: number }
 
@@ -55,6 +56,7 @@ export default function Settings() {
           </div>
         </div>
       )}
+      <div style={{ marginTop: 16 }}><UpdatesSection /></div>
     </>
   );
 }

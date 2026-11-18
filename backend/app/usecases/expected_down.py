@@ -177,7 +177,7 @@ class ExpectedDown(TaskDefinition):
             days = int(ctx.params.get("maintenance_days", 90))
             ids = [i.payload["device_id"] for i in excl]
             try:
-                res = cc.wait_all(cc.exclude_devices(ids, days, f"CiscoAIOps: expected-down/flapping ({len(ids)})", tag),
+                res = cc.wait_all(cc.exclude_devices(ids, days, f"AIOps: expected-down/flapping ({len(ids)})", tag),
                                   timeout=timeout)
             except Exception as exc:  # noqa: BLE001
                 results.update(fail_all(excl, f"exclude failed: {exc}"))

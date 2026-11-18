@@ -1,12 +1,26 @@
-# CiscoAIOps
+# AIOps: AI-Assisted Operations for Cisco Catalyst Center
 
-Local, offline AI assistant for repetitive, low-priority network tasks. Recurring tasks analyse data
-from Cisco Catalyst Center (2.x and 3.x), propose changes with a confidence score and evidence, and
-either queue them for operator review or execute them autonomously within the autonomy level and caps
-configured in the portal. A local LLM (Ollama) reviews uncertain proposals; nothing leaves the host.
+**Your network's night shift: a local AI that clears the repetitive Catalyst Center backlog, shows its
+evidence, and only acts as autonomously as you allow.**
 
-Generation 1 data source: Catalyst Center. All changes go through the Catalyst Center API; nothing
-connects to WLCs, APs or switches directly (no SSH, NETCONF or Command Runner).
+## Why it's valuable
+
+Every Catalyst Center estate collects the same low-priority debt: APs without a site, devices on the wrong
+floor, APs back on factory names, roles that drifted, devices that have been down for months and
+telemetry that silently stopped. Each fix is small; together they eat engineering days and degrade
+assurance, maps and reports. AIOps works through that backlog continuously.
+
+- **Evidence, not guesses.** Every proposal carries a confidence score and the signals behind it
+  (CDP/LLDP neighbours, RF neighbours, naming, subnets, inventory history, optional GeoIP).
+- **You set the autonomy.** L0 report only, L1 every change reviewed, L2 automatic above a confidence
+  threshold, L3 full autonomy. Per-task caps, a global cap and a kill switch.
+- **Private by design.** The LLM runs locally (Ollama, CPU only). No network data leaves the host.
+- **Safe change path.** Every change goes through the Catalyst Center API. Nothing connects to WLCs, APs
+  or switches directly (no SSH, NETCONF or Command Runner).
+- **Accountable.** Every approval, change, setting and log view is in the audit log; a review queue
+  dashboard shows the trend per category over 30 days.
+- **Isolated workers.** Each domain runs in its own container and queue, so one runaway task cannot stall
+  the others.
 
 | Task | Worker | Max level | What it does |
 |---|---|---|---|
@@ -19,112 +33,188 @@ connects to WLCs, APs or switches directly (no SSH, NETCONF or Command Runner).
 | Telemetry baseline | health | L3 | Classifies missing telemetry (SNMP, credentials, collection failure, stale sync); resyncs stale devices, reports the rest to the owner |
 | Device role correction | inventory | L2 | Access/distribution/core from the CDP/LLDP topology; corrects wrong roles |
 
-**GeoIP is optional.** Every task works without it. When a GeoIP database is uploaded it adds one more
-vote (default weight 0.15) on top of the existing signals; a proposal backed only by GeoIP is capped at
-confidence 60 and is never executed automatically.
+**GeoIP is optional.** Every task works without it. An uploaded GeoIP database adds one more vote
+(default weight 0.15); a proposal backed only by GeoIP is capped at confidence 60 and never executed
+automatically.
 
-## Requirements
+## Getting started
 
-- Debian 12, Ubuntu 22.04/24.04 or RHEL/Rocky/Alma 9 (x86_64)
-- 8-16 CPU cores, 32 GB RAM (minimum 4 cores / 16 GB), 40 GB free disk under the Docker root
-- Internet access **during installation only** (or use an offline bundle, see below)
-- HTTPS access from the host to the Catalyst Center(s)
+### Operating system
 
-## Install
+A dedicated Linux VM or server, x86_64, with systemd:
+
+- **Debian 12** (tested)
+- **Ubuntu 22.04 / 24.04**
+- **Red Hat Enterprise Linux 9**, and Rocky Linux / AlmaLinux 9
+
+The installer installs Docker Engine and the compose plugin from Docker's repositories when missing.
+
+### Machine
+
+| | Requirement |
+|---|---|
+| CPU | 16 vCPU, x86_64 with AVX2 |
+| Memory | 64 GB RAM |
+| Disk | 200 GB SSD under the Docker root (`/var/lib/docker`) |
+
+The LLM runs on the CPU, so more cores means faster reviews. The size leaves room for a larger model,
+more use cases and more Catalyst Centers, two models side by side during a model change, image versions
+kept for rollback, database growth and 14 days of backups.
+
+Network: HTTPS from the host to your Catalyst Center(s), and to GitHub for installation and updates
+(see [Updates](#updates)).
+
+### Install
+
+One command, run on the host:
 
 ```bash
-tar -xzf ciscoaiops-<version>.tar.gz
-cd ciscoaiops-<version>
-sudo ./install.sh
+curl -fsSL https://raw.githubusercontent.com/mbechc/AI-Assisted-Ops/master/get-aiops.sh | sudo bash
 ```
 
-The installer installs Docker Engine if missing, writes `/opt/CiscoAIOps`, generates secrets and a
-self-signed TLS certificate, builds/pulls all images, downloads the LLM model, initialises the database,
-creates the `admin` user and runs a self-test. The generated admin password is printed and stored in
-`/opt/CiscoAIOps/initial-admin-password.txt` (delete it after the first login).
+It finds the newest Production release on GitHub, verifies its checksum, installs into `/opt/AIOps`,
+pulls the prebuilt images from ghcr.io and the local LLM model, initialises the database, creates the
+`admin` user and runs a self-test. At the end it prints the portal URL and the admin password (also stored
+in `/opt/AIOps/initial-admin-password.txt`; delete it after the first login).
 
-Common options (`./install.sh --help` for all):
+Options go after `bash -s --`:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/mbechc/AI-Assisted-Ops/master/get-aiops.sh \
+  | sudo bash -s -- --hostname aiops.example.com --channel production
+```
 
 | Option | Meaning |
 |---|---|
+| `--dir DIR` | Installation folder (default `/opt/AIOps`) |
+| `--channel production\|development` | Update track (default `production`) |
+| `--version X.Y.Z` | Install a specific release |
 | `--hostname NAME` | Name in the TLS certificate and portal URL |
 | `--admin-password PW` | Set the initial admin password instead of generating one |
-| `--https-port N` / `--http-port N` | Change published ports (default 443/80) |
+| `--https-port N` / `--http-port N` | Published ports (default 443/80) |
 | `--with-mock` | Also start two simulated Catalyst Centers (2.3.5.6 and 3.1.3.0) for evaluation |
-| `--offline-bundle FILE` | Install without Internet from an offline bundle |
-| `-y` | Non-interactive |
 
-After installation the system needs no Internet access.
+Behind a proxy: `export https_proxy=http://proxy:3128` and run `sudo -E bash` instead of `sudo bash`;
+configure the Docker daemon proxy as well, so image pulls work.
 
-To use your own certificate, replace `/opt/CiscoAIOps/certs/server.crt` and `server.key` and run
-`docker compose restart web` in `/opt/CiscoAIOps`.
+### First configuration
 
-## Offline installation
+1. Log in at `https://<host>/` as `admin` and change the password (user menu, bottom left).
+2. **Data sources**: add the Catalyst Center (URL, a user with network-admin or an assign-device role),
+   then **Test**, which detects the release and shows which API variant each operation uses.
+3. **Recurring tasks → AP site assignment**: select the source, run once, and review the proposals in
+   **Review queue**.
+4. As calibration builds up (approved vs. rejected per confidence band), raise the autonomy level. Every
+   task has a cap; the global cap and the kill switch are under **Settings**. Effective level =
+   min(selected, task cap, global cap).
+5. **Site hierarchy drift**: approve the current hierarchy as the baseline on the task page; later runs
+   report changes against it.
+6. **GeoIP (optional)**: add a data source of type GeoIP and upload a MaxMind-format `.mmdb` (GeoIP2/GeoLite2
+   City or an internal database with a site/building field) under **Manage GeoIP**.
+7. Optional: replace `/opt/AIOps/certs/server.crt` and `server.key` with your own certificate and run
+   `docker compose restart web` in `/opt/AIOps`.
 
-On a connected host with CiscoAIOps installed:
+## Updates
+
+**Settings → Updates** shows the installed version, the track and the newest release for that track.
+Administrators switch track, refresh and install; operators and viewers see the same information read-only.
+
+| Track | Offers |
+|---|---|
+| **Production** | Stable releases (`vX.Y.Z`) only |
+| **Development** | Every release, including pre-releases (`vX.Y.Z-dev.N`) |
+
+Switching back from Development to Production takes effect with the next Production release that is the
+same version or newer; older versions are never offered.
+
+Installing an update runs on the host: the release is downloaded and its checksum verified, a backup is
+taken (database, `.env`, certificates), the changed image layers are pulled from ghcr.io (each service is
+its own image, and unchanged layers are not downloaded again), migrations run and services restart. The
+log is shown live in the portal.
+
+Updates are online only. The host must reach:
+
+| Host | Used for |
+|---|---|
+| `api.github.com` | Release lookup |
+| `github.com` | Release download |
+| `objects.githubusercontent.com`, `release-assets.githubusercontent.com` | Release download (redirect target) |
+| `ghcr.io`, `pkg-containers.githubusercontent.com` | Application images |
+| `registry-1.docker.io`, `auth.docker.io`, `production.cloudflare.docker.com` | Base images (PostgreSQL, Redis, Ollama), when a release changes them |
+| `registry.ollama.ai` | LLM model, when a release changes it |
+
+**Refresh** tests the GitHub endpoints from the Linux host itself (its DNS, proxy and firewall) and shows
+each one as reachable or not, with the response time or the error. The same test runs every 15 minutes
+(`AIOPS_CONNECTIVITY_INTERVAL_MIN` in `.env`) and drives the status on the **Dashboard**: **Connected**
+when every endpoint answered, **AirGapped** when one or more did not. The appliance keeps working without
+Internet; only updates need it.
+
+How it works: the portal never gets root or the Docker socket. It drops a request file into
+`/opt/AIOps/data/update/requests`; the systemd unit `aiops-updater.path` starts `scripts/update.sh` on the
+host, which writes its results back to `data/update`. From the shell:
 
 ```bash
-sudo /opt/CiscoAIOps/scripts/export-bundle.sh /tmp/ciscoaiops-offline.tar
+sudo /opt/AIOps/scripts/update.sh --check            # reachability and release lookup
+sudo /opt/AIOps/scripts/update.sh --channel development
+sudo /opt/AIOps/scripts/update.sh --version 0.3.0
 ```
 
-On the air-gapped host (Docker Engine must already be installed):
+**Rollback**: restore the backup taken right before the update without migrating it, then install the
+previous release:
 
 ```bash
-tar -xf ciscoaiops-offline.tar
-cd ciscoaiops-<version>
-sudo ./install.sh --offline-bundle ../ciscoaiops-offline.tar --skip-docker-install
+sudo /opt/AIOps/scripts/restore.sh --no-migrate /opt/AIOps/backups/db-<timestamp>.sql.gz
+curl -fsSL https://raw.githubusercontent.com/mbechc/AI-Assisted-Ops/master/get-aiops.sh | sudo bash -s -- --version <previous>
 ```
 
 ## Operations
 
-All scripts are in `/opt/CiscoAIOps`:
+All scripts are in `/opt/AIOps`:
 
 | Command | Purpose |
 |---|---|
 | `scripts/healthcheck.sh` | Container health, portal, API, database, Redis, LLM self-test |
 | `scripts/backup.sh` | Database dump + `.env`/certificates into `backups/` (keeps 14) |
 | `scripts/restore.sh backups/db-....sql.gz` | Restore a database dump |
-| `upgrade.sh` (from the new package) | Backup, then upgrade in place; data and settings are kept |
+| `scripts/update.sh` | Host updater (see [Updates](#updates)) |
 | `scripts/record-fixtures.sh <source-id>` | Record sanitized Catalyst Center responses for support |
 | `scripts/acceptance-mock.sh` | End-to-end test of every task against the simulators (install with `--with-mock`) |
-| `scripts/uninstall.sh [--purge]` | Remove containers (`--purge`: also data, model and images) |
+| `scripts/uninstall.sh [--purge]` | Remove containers (`--purge`: also data, model, images and the updater units) |
 
 Keep a copy of `.env`: it contains the key that encrypts stored Catalyst Center credentials.
 
-## First steps in the portal
+**Workers, Runners and logs.** Tasks run in separate worker containers (`worker-default`,
+`worker-wireless`, `worker-inventory`, `worker-health`), each with its own queue, memory limit and
+read-only filesystem. **Runners** shows each worker's health, active and queued runs, failures in the
+last 24 hours, CPU/memory and the schedule for the next 24 hours. **Container logs** (admins only, every
+view is audited) follows the live logs of the AIOps containers through `logproxy`, a socket proxy that
+only allows reading container information and logs.
 
-1. **Data sources**: add the Catalyst Center (URL, a user with network-admin or an assign-device role),
-   then **Test**, which detects the release and shows which API variant is used for each operation.
-2. **Tasks → AP site assignment**: select the source, run once, and review the proposals in **Review**.
-3. As calibration builds up (approved vs. rejected per confidence band), raise the autonomy level.
-   Every task has a cap; the global cap and the kill switch are under **Settings**.
-
-Autonomy levels: L0 report only, L1 every proposal is reviewed, L2 proposals at or above the threshold
-are executed automatically, L3 full autonomy. Effective level = min(selected, task cap, global cap).
-
-4. **Site hierarchy drift**: approve the current hierarchy as the baseline on the task page; later runs
-   report changes against it.
-5. **GeoIP (optional)**: add a data source of type GeoIP, upload a MaxMind-format `.mmdb` (GeoIP2/GeoLite2
-   City or an internal database with a site/building field) under **Manage GeoIP**. Uploaded versions are
-   kept, so an earlier one can be re-activated. Location keys are learned from APs already in the right
-   building; unmapped keys can be mapped to a building by hand.
-
-## Workers, Runners and logs
-
-Tasks run in separate worker containers (`worker-default`, `worker-wireless`, `worker-inventory`,
-`worker-health`), each with its own queue, memory limit and read-only filesystem, so a failing or runaway
-task cannot take the others down. **Runners** shows each worker's health, active and queued runs,
-failures in the last 24 hours, container CPU/memory and the schedule for the next 24 hours.
-
-**Container logs** (admins only, every view is audited) follows the live logs of the CiscoAIOps
-containers; a run's drawer can follow just the lines of that run. Logs are read through `logproxy`, a
-socket proxy that only allows reading container information and logs; the API never gets the Docker socket
-and other containers on the host are not shown.
+**Offline installation** (installation only; updates need GitHub): on a connected AIOps host run
+`sudo /opt/AIOps/scripts/export-bundle.sh /tmp/aiops-offline.tar`, then on the target host (Docker
+already installed): `tar -xf aiops-offline.tar && cd aiops-<version> && sudo ./install.sh --offline-bundle ../aiops-offline.tar --skip-docker-install`.
 
 ## Development
 
 ```bash
 make test      # backend unit tests (against both simulated Catalyst Center releases) + frontend typecheck
-make release   # dist/ciscoaiops-<version>.tar.gz
-make deploy HOST=root@<host> INSTALL_ARGS="--yes --with-mock"
+make release   # dist/aiops-<version>.tar.gz
+make deploy HOST=root@<host> INSTALL_ARGS="--yes --build --with-mock"   # builds the images on the host
 ```
+
+### Cutting a release (maintainers)
+
+1. Set the version in `VERSION` (and `frontend/package.json`, `backend/app/config.py`,
+   the image defaults in `docker-compose.yml`).
+2. Commit, then tag and push: `git tag v0.3.0 && git push origin v0.3.0`. Use `v0.3.0-dev.1` for a
+   Development pre-release.
+3. The `release` workflow runs the tests, pushes `ghcr.io/mbechc/aiops-backend` and `aiops-web` with that
+   version, and publishes the GitHub Release with `aiops-<version>.tar.gz` and `SHA256SUMS`. Tags with a
+   `-` are marked as pre-releases and only offered on the Development track.
+
+The ghcr.io packages must be public (Package settings → Change visibility) so appliances can pull without
+credentials.
+
+## License
+
+See [LICENSE](LICENSE).
