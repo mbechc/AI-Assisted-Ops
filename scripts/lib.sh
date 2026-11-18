@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Shared helpers for AIOps scripts. Source, do not execute.
 
 INSTALL_DIR="${INSTALL_DIR:-/opt/AIOps}"
