@@ -40,6 +40,19 @@ def is_unreachable(reachability: str | None) -> bool:
     return (reachability or "").strip().lower() in UNREACHABLE
 
 
+# Column limits of inventory_devices; one oversized field must not fail the whole snapshot.
+LIMITS = {c.name: c.type.length for c in InventoryDevice.__table__.columns if getattr(c.type, "length", None)}
+
+
+def _fit(values: dict, label: str, trimmed: dict[str, list[str]]) -> dict:
+    for k, v in values.items():
+        limit = LIMITS.get(k)
+        if limit and isinstance(v, str) and len(v) > limit:
+            values[k] = v[:limit]
+            trimmed.setdefault(k, []).append(f"{label} ({len(v)} chars)")
+    return values
+
+
 def collect(db: Session, source_id: int, cc: CatalystCenter, log=lambda m: None) -> InventorySnapshot:
     sites = cc.get_sites()
     devices = cc.get_devices()
@@ -53,10 +66,11 @@ def collect(db: Session, source_id: int, cc: CatalystCenter, log=lambda m: None)
     existing = {d.device_id: d for d in db.scalars(select(InventoryDevice).where(InventoryDevice.source_id == source_id))}
     changes = 0
     seen: set[str] = set()
+    trimmed: dict[str, list[str]] = {}
     for dev in devices:
         seen.add(dev.id)
         row = existing.get(dev.id)
-        new = {
+        new = _fit({
             "hostname": dev.hostname or "", "mgmt_ip": dev.mgmt_ip, "mac": dev.mac, "eth_mac": dev.eth_mac,
             "family": dev.family or "", "platform": dev.platform, "series": dev.series, "role": dev.role,
             "software_version": dev.software_version, "serial": dev.serial, "wlc_ip": dev.wlc_ip,
@@ -64,7 +78,7 @@ def collect(db: Session, source_id: int, cc: CatalystCenter, log=lambda m: None)
             "collection_status": dev.collection_status, "error_code": dev.error_code,
             "error_description": dev.error_description, "last_update_at": _ms_to_dt(dev.last_update_ms),
             "site_id": assignments.get(dev.id),
-        }
+        }, dev.hostname or dev.id, trimmed)
         if row is None:
             row = InventoryDevice(source_id=source_id, device_id=dev.id, first_seen=ts,
                                   unreachable_since=ts if is_unreachable(dev.reachability) else None, **new)
@@ -97,6 +111,9 @@ def collect(db: Session, source_id: int, cc: CatalystCenter, log=lambda m: None)
             db.add(DeviceStateHistory(source_id=source_id, device_id=dev_id, ts=ts, field="presence",
                                       old="present", new="removed"))
             removed += 1
+    for field, where in trimmed.items():
+        log(f"WARNING: {len(where)} {field} value(s) longer than {LIMITS[field]} characters were shortened: "
+            f"{', '.join(where[:5])}{' ...' if len(where) > 5 else ''}")
     aps = sum(1 for d in devices if d.is_ap)
     snap = InventorySnapshot(
         source_id=source_id, taken_at=ts,
@@ -104,7 +121,7 @@ def collect(db: Session, source_id: int, cc: CatalystCenter, log=lambda m: None)
         device_count=len(devices), ap_count=aps, sites=[s.to_dict() for s in sites],
         links=[[ln.a_id, ln.b_id, ln.a_port, ln.b_port] for ln in links],
         stats={"changes": changes, "removed": removed, "assigned": len(assignments), "links": len(links),
-               "new": len(seen - set(existing))},
+               "new": len(seen - set(existing)), "trimmed": {k: len(v) for k, v in trimmed.items()}},
     )
     db.add(snap)
     cutoff = ts - timedelta(days=SNAPSHOT_RETENTION_DAYS)

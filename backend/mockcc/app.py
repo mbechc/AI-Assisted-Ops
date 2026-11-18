@@ -510,4 +510,5 @@ def truth():
             "roles": {d["id"]: d["role"] for d in estate.devices if d["id"] in estate.role_truth},
             "telemetry_truth": estate.telemetry_truth,
             "expected_down": sorted(estate.expected_down), "flapping": sorted(estate.flapping),
-            "transient_down": sorted(estate.transient_down), "excluded": sorted(excluded_ids())}
+            "transient_down": sorted(estate.transient_down), "excluded": sorted(excluded_ids()),
+            "stacks": estate.stacks}

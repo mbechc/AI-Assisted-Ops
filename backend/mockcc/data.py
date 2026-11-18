@@ -32,6 +32,7 @@ class Estate:
     transient_down: set[str] = field(default_factory=set)
     site_ids_by_name: dict[str, str] = field(default_factory=dict)
     name_reset: dict[str, str] = field(default_factory=dict)  # AP id -> factory name after POST /mock/reset_names
+    stacks: list[str] = field(default_factory=list)  # switch stacks (comma-joined platform and serial)
 
 
 def build(seed: int = 1, total_aps: int = 6000, unassigned_ratio: float = 0.2) -> Estate:
@@ -306,6 +307,16 @@ def _specialist_truth(e: Estate, seed: int, floors_all, cities) -> None:
             h = d["apEthernetMacAddress"].replace(":", "")
             e.name_reset[d["id"]] = f"AP{h[0:4]}.{h[4:8]}.{h[8:12]}"
             e.name_truth[d["id"]] = d["hostname"]
+
+    # Switch stacks: Catalyst Center joins the platform and serial of every member with commas.
+    # Derived from existing switches without new random draws, so the rest of the estate is unchanged.
+    stacks = [d for d in e.devices if d["family"] == "Switches and Hubs" and d["platformId"].startswith("C9300")
+              and d["id"] not in e.expected_down][:2]
+    for members, d in zip((8, 4), stacks):
+        base = int(d["serialNumber"][3:])
+        d["platformId"] = ", ".join([d["platformId"]] * members)
+        d["serialNumber"] = ", ".join(f"FOC{base + i}" for i in range(members))
+        e.stacks.append(d["id"])
 
 
 def _device(rng, dev_id, hostname, ip, family, typ, platform) -> dict:

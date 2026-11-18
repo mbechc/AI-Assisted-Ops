@@ -12,6 +12,23 @@ permissions:
 jobs:
   backend:
     runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        # SQLite does not enforce column lengths; the appliance runs PostgreSQL.
+        db: [sqlite, postgres]
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: aiops
+          POSTGRES_PASSWORD: aiops
+          POSTGRES_DB: aiops
+        ports: ["5432:5432"]
+        options: >-
+          --health-cmd "pg_isready -U aiops" --health-interval 5s --health-timeout 5s --health-retries 10
+    env:
+      DATABASE_URL_OVERRIDE: ${{ matrix.db == 'postgres' && 'postgresql+psycopg://aiops:aiops@localhost:5432/aiops' || 'sqlite://' }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
@@ -20,6 +37,14 @@ jobs:
           cache: pip
           cache-dependency-path: backend/requirements.txt
       - run: pip install -r backend/requirements.txt
+      - name: Migrations up, down and up again
+        if: matrix.db == 'postgres'
+        working-directory: backend
+        run: |
+          python -m alembic upgrade head
+          python -m alembic downgrade 0003
+          python -m alembic upgrade head
+          python -m alembic downgrade base
       - run: python -m pytest -q
         working-directory: backend
 
