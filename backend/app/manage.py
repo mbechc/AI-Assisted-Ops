@@ -95,7 +95,12 @@ def cmd_add_mock_sources(args) -> int:
     from app.db import session_scope
     from app.models import DataSource
     from app.security import encrypt_secret
+    from app.store import get_setting, set_setting
     with session_scope() as db:
+        # Only once per installation: a mock source deleted in the portal stays deleted across upgrades.
+        if get_setting(db, "mock_sources_seeded"):
+            print("mock sources were added before; not re-adding")
+            return 0
         for name, url in (("Mock Catalyst Center 2.3.5", "http://mockcc-23:8080"),
                           ("Mock Catalyst Center 3.1.3", "http://mockcc-31:8080")):
             if db.scalars(select(DataSource).where(DataSource.name == name)).first():
@@ -103,6 +108,7 @@ def cmd_add_mock_sources(args) -> int:
             db.add(DataSource(name=name, kind="catalyst_center", base_url=url, username="admin",
                               secret_enc=encrypt_secret("mock"), verify_tls=False, rate_limit_rps=50,
                               enabled=False))
+        set_setting(db, "mock_sources_seeded", True)
     print("mock sources added (disabled; enable one in the UI)")
     return 0
 

@@ -3,6 +3,7 @@ import { Link, useParams } from "react-router-dom";
 import { useAuth } from "../App";
 import { api, duration, fmtDate } from "../api";
 import { ErrorLine, Level, Status, useAsync } from "../components";
+import { CRON_PRESETS, describeCron } from "../cron";
 import { Run, Source, Task } from "../types";
 import { RunDrawer } from "./Runs";
 
@@ -185,8 +186,19 @@ function Config({ task, onSaved }: { task: Task; onSaved: (t: Task) => void }) {
         </div>
         <h3>Schedule and source</h3>
         <div className="grid cols-2">
-          <label className="field">Cron (UTC)
-            <input disabled={!admin} value={cfg.cron} onChange={(e) => setCfg({ ...cfg, cron: e.target.value })} />
+          <label className="field">Schedule (cron, UTC)
+            {admin && (
+              <select value={CRON_PRESETS.some((p) => p.cron === cfg.cron) ? cfg.cron : ""}
+                onChange={(e) => e.target.value && setCfg({ ...cfg, cron: e.target.value })}>
+                <option value="">Custom</option>
+                {CRON_PRESETS.map((p) => <option key={p.cron} value={p.cron}>{p.label}</option>)}
+              </select>
+            )}
+            <input disabled={!admin} value={cfg.cron} onChange={(e) => setCfg({ ...cfg, cron: e.target.value })}
+              placeholder="minute hour day month weekday" />
+            <span className="small">{describeCron(cfg.cron) || "Custom schedule"}
+              {cfg.cron === task.config.cron && task.next_run && cfg.enabled && <> - next run {fmtDate(task.next_run)}</>}
+              {cfg.cron !== task.config.cron && <> - not saved yet</>}</span>
           </label>
           <label className="field">Data source
             <select disabled={!admin} value={cfg.source_id ?? ""} onChange={(e) => setCfg({ ...cfg, source_id: e.target.value ? Number(e.target.value) : null })}>

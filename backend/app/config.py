@@ -7,7 +7,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=None, extra="ignore")
 
-    aiops_version: str = "0.2.1"
+    aiops_version: str = "0.2.2-dev.1"
     aiops_hostname: str = "aiops.local"
 
     postgres_db: str = "aiops"

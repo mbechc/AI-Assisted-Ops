@@ -8,7 +8,7 @@ from app.models import CacheEntry, Setting
 
 DEFAULT_SETTINGS: dict[str, Any] = {
     "kill_switch": False,
-    "global_autonomy_cap": 3,
+    "global_autonomy_cap": 1,
 }
 
 
@@ -23,6 +23,7 @@ def set_setting(db: Session, key: str, value: Any) -> None:
     row = db.get(Setting, key)
     if row is None:
         db.add(Setting(key=key, value={"v": value}))
+        db.flush()
     else:
         row.value = {"v": value}
 

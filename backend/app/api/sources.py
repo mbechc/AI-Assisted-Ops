@@ -1,16 +1,19 @@
+import os
+import shutil
 import time
 from datetime import datetime, timezone
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.audit import audit
+from app.config import get_settings
 from app.connectors.base import CONNECTOR_KINDS
 from app.connectors.catalyst_center import CapabilityUnavailable, CatalystCenter
 from app.deps import current_user, get_db, require
-from app.models import DataSource, User
+from app.models import DataSource, TaskRun, User, WorkItem
 from app.security import encrypt_secret
 from app.sources import build_cc_client, save_capabilities
 from app.store import cache_get
@@ -88,10 +91,30 @@ def delete_source(source_id: int, db: Session = Depends(get_db), admin: User = D
     s = db.get(DataSource, source_id)
     if s is None:
         raise HTTPException(404, "not found")
+    running = db.scalar(select(func.count()).select_from(TaskRun).where(
+        TaskRun.source_id == source_id, TaskRun.status == "running"))
+    executing = db.scalar(select(func.count()).select_from(WorkItem).where(
+        WorkItem.source_id == source_id, WorkItem.status == "executing"))
+    if running or executing:
+        raise HTTPException(409, f"{s.name} has {running} running run(s) and {executing} change(s) executing "
+                                 "against it; wait for them to finish")
+    now = datetime.now(timezone.utc)
+    note = f"data source {s.name} deleted"
+    # Everything still open for this source goes; finished runs and decided items stay for history
+    # (their source_id becomes NULL).
+    closed = db.execute(update(WorkItem).where(
+        WorkItem.source_id == source_id, WorkItem.status.in_(("proposed", "reported", "approved")))
+        .values(status="superseded", outcome={"source_deleted": True}, decided_at=now, decided_by=admin.username,
+                decision_note=note)).rowcount
+    cancelled = db.execute(update(TaskRun).where(TaskRun.source_id == source_id, TaskRun.status == "queued")
+                           .values(status="failed", finished_at=now, error=f"cancelled: {note}")).rowcount
     db.delete(s)
-    audit(db, admin.username, "source.deleted", "source", source_id, name=s.name)
+    audit(db, admin.username, "source.deleted", "source", source_id, name=s.name, kind=s.kind,
+          open_items_closed=closed, queued_runs_cancelled=cancelled)
     db.commit()
-    return {"ok": True}
+    if s.kind == "geoip":
+        shutil.rmtree(os.path.join(get_settings().geoip_dir, str(source_id)), ignore_errors=True)
+    return {"ok": True, "open_items_closed": closed, "queued_runs_cancelled": cancelled}
 
 
 @router.post("/{source_id}/test")

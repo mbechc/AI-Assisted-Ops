@@ -102,15 +102,18 @@ configure the Docker daemon proxy as well, so image pulls work.
 1. Log in at `https://<host>/` as `admin` and change the password (user menu, bottom left).
 2. **Data sources**: add the Catalyst Center (URL, a user with network-admin or an assign-device role),
    then **Test**, which detects the release and shows which API variant each operation uses.
-3. **Recurring tasks → AP site assignment**: select the source, run once, and review the proposals in
-   **Review queue**.
+3. **Recurring tasks**: press **Run** on a task (or open it to set its source and schedule), then review
+   the proposals in **Review queue**. Schedules are cron expressions in UTC with presets on the task page.
 4. As calibration builds up (approved vs. rejected per confidence band), raise the autonomy level. Every
-   task has a cap; the global cap and the kill switch are under **Settings**. Effective level =
-   min(selected, task cap, global cap).
+   task has a cap; the global cap and the kill switch are under **Settings**. The global cap starts at
+   L1 (human review) on a fresh install. Effective level = min(selected, task cap, global cap).
 5. **Site hierarchy drift**: approve the current hierarchy as the baseline on the task page; later runs
    report changes against it.
 6. **GeoIP (optional)**: add a data source of type GeoIP and upload a MaxMind-format `.mmdb` (GeoIP2/GeoLite2
    City or an internal database with a site/building field) under **Manage GeoIP**.
+   Deleting a data source (admins) removes its inventory data and closes its open review items and queued
+   runs; finished runs and decisions stay in the history. The simulated sources are added once, so a
+   deleted one does not come back on upgrade.
 7. Optional: replace `/opt/AIOps/certs/server.crt` and `server.key` with your own certificate and run
    `docker compose restart web` in `/opt/AIOps`.
 

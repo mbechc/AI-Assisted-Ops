@@ -47,6 +47,19 @@ export default function Sources() {
     }
   };
 
+  const remove = async (s: Source) => {
+    const what = s.kind === "geoip" ? "its uploaded GeoIP databases" : "its inventory snapshots and history";
+    if (!confirm(`Delete data source "${s.name}"?\n\nThis removes ${what}. Open review items and queued runs for this ` +
+      "source are removed; finished runs and decisions stay in the history and audit log.")) return;
+    setErr(null);
+    try {
+      await api.del(`/sources/${s.id}`);
+      sources.reload();
+    } catch (e: any) {
+      setErr(e.message);
+    }
+  };
+
   const showCaps = async (s: Source) => {
     const r = await api.get<{ capabilities: CapabilityRow[] }>(`/sources/${s.id}/capabilities`);
     setCaps({ name: s.name, rows: r.capabilities });
@@ -77,6 +90,7 @@ export default function Sources() {
                       : <button onClick={() => showCaps(s)}>Capabilities</button>}
                     {can("operator") && <button onClick={() => runTest(s)} disabled={test?.busy}>{test?.busy && test.id === s.id ? "Testing..." : "Test"}</button>}
                     {can("admin") && <button onClick={() => setEdit({ ...EMPTY, ...s, password: "", ca_bundle: "" })}>Edit</button>}
+                    {can("admin") && <button className="danger" onClick={() => remove(s)}>Delete</button>}
                   </div>
                 </td>
               </tr>

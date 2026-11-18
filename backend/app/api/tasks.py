@@ -324,7 +324,7 @@ def items_kpis(db: Session = Depends(get_db), _=Depends(current_user)):
     resolved: Counter = Counter()
     for key, outcome in db.execute(select(WorkItem.task_key, WorkItem.outcome).where(
             WorkItem.status == "superseded", WorkItem.decided_at >= cutoff)).all():
-        if not (outcome or {}).get("removed_from_inventory"):
+        if not (outcome or {}).get("removed_from_inventory") and not (outcome or {}).get("source_deleted"):
             resolved[key] += 1
     history = _open_history(db, KPI_DAYS, KPI_STEP_HOURS)
     per_day = 24 // KPI_STEP_HOURS
