@@ -1,24 +1,33 @@
-import { ReactNode, useCallback, useEffect, useState } from "react";
+import { ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { ConnectionError } from "./api";
 
 export function useAsync<T>(fn: () => Promise<T>, deps: unknown[], pollMs?: number) {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
+  const loaded = useRef(false);
   const load = useCallback(() => {
     setLoading(true);
     return fn()
       .then((d) => {
+        loaded.current = true;
         setData(d);
         setError(null);
       })
-      .catch((e) => setError(String(e.message || e)))
+      .catch((e) => {
+        // The connection banner explains an outage; keep showing the last data instead of an error.
+        if (!(e instanceof ConnectionError && loaded.current)) setError(String(e.message || e));
+      })
       .finally(() => setLoading(false));
   }, deps);
   useEffect(() => {
     load();
-    if (!pollMs) return;
-    const t = setInterval(load, pollMs);
-    return () => clearInterval(t);
+    window.addEventListener("aiops:online", load);
+    const t = pollMs ? setInterval(load, pollMs) : undefined;
+    return () => {
+      window.removeEventListener("aiops:online", load);
+      if (t) clearInterval(t);
+    };
   }, [load, pollMs]);
   return { data, error, loading, reload: load, setData };
 }

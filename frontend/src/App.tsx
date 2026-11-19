@@ -1,6 +1,6 @@
-import { createContext, useContext, useEffect, useState } from "react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { NavLink, Navigate, Route, Routes } from "react-router-dom";
-import { api } from "./api";
+import { api, ConnectionError, isOnline, LOST_CONNECTION, probe } from "./api";
 import { useAsync } from "./components";
 import { applyTheme } from "./theme";
 import { Role, User } from "./types";
@@ -33,19 +33,40 @@ export const useAuth = () => useContext(Ctx)!;
 
 export default function App() {
   const [user, setUser] = useState<User | null | undefined>(undefined);
+  const [unreachable, setUnreachable] = useState(false);
+  const userRef = useRef(user);
+  userRef.current = user;
 
   useEffect(() => {
-    api.get<User>("/auth/me").then(setUser).catch(() => setUser(null));
+    const me = () =>
+      api.get<User>("/auth/me")
+        .then((u) => {
+          setUnreachable(false);
+          setUser(u);
+        })
+        .catch((e) => {
+          // Only a real 401 means "logged out"; a lost connection must not show the login page.
+          if (e instanceof ConnectionError) setUnreachable(true);
+          else setUser(null);
+        });
+    me();
+    const retryMe = () => {
+      if (userRef.current === undefined) me();
+    };
     const h = () => setUser(null);
     window.addEventListener("aiops:unauthorized", h);
-    return () => window.removeEventListener("aiops:unauthorized", h);
+    window.addEventListener("aiops:online", retryMe);
+    return () => {
+      window.removeEventListener("aiops:unauthorized", h);
+      window.removeEventListener("aiops:online", retryMe);
+    };
   }, []);
 
   useEffect(() => {
     if (user?.theme) applyTheme(user.theme);
   }, [user?.theme]);
 
-  if (user === undefined) return null;
+  if (user === undefined) return unreachable ? <Unreachable /> : null;
   if (user === null) return <Login onLogin={setUser} />;
 
   const ctx: AuthCtx = {
@@ -58,6 +79,44 @@ export default function App() {
     <Ctx.Provider value={ctx}>
       <Shell />
     </Ctx.Provider>
+  );
+}
+
+function Unreachable() {
+  const [busy, setBusy] = useState(false);
+  return (
+    <div className="login card">
+      <h1>AIOps</h1>
+      <p className="err" style={{ marginBottom: 12 }}>Cannot reach the AIOps platform.</p>
+      <p className="sub" style={{ marginBottom: 16 }}>Check VPN or network. Retrying automatically...</p>
+      <button disabled={busy} onClick={() => { setBusy(true); probe().finally(() => setBusy(false)); }}>
+        {busy ? "Checking..." : "Retry now"}
+      </button>
+    </div>
+  );
+}
+
+function ConnectionBanner() {
+  const [message, setMessage] = useState<string | null>(isOnline() ? null : LOST_CONNECTION);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => {
+    const down = (e: Event) => setMessage((e as CustomEvent<string>).detail || LOST_CONNECTION);
+    const up = () => setMessage(null);
+    window.addEventListener("aiops:offline", down);
+    window.addEventListener("aiops:online", up);
+    return () => {
+      window.removeEventListener("aiops:offline", down);
+      window.removeEventListener("aiops:online", up);
+    };
+  }, []);
+  if (!message) return null;
+  return (
+    <div className="banner bad conn-banner" role="alert">
+      <span>{message} Retrying automatically...</span>
+      <button disabled={busy} onClick={() => { setBusy(true); probe().finally(() => setBusy(false)); }}>
+        {busy ? "Checking..." : "Retry now"}
+      </button>
+    </div>
   );
 }
 
@@ -91,6 +150,7 @@ function Shell() {
         <UserMenu />
       </aside>
       <main className="main">
+        <ConnectionBanner />
         {settings?.kill_switch && (
           <div className="banner bad">
             Kill switch is ON: no changes are executed against the network. Proposals are still generated and can be reviewed.

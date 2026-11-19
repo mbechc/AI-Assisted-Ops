@@ -79,6 +79,8 @@ pre { background: var(--input-bg); border: 1px solid var(--border); border-radiu
 .banner.bad { background: rgba(248, 81, 73, .12); border-color: var(--bad); }
 .banner.warn { background: rgba(210, 153, 34, .12); border-color: var(--warn); }
 .banner.info { background: rgba(88, 166, 255, .1); border-color: var(--info); }
+.conn-banner { position: sticky; top: 8px; z-index: 20; display: flex; align-items: center; justify-content: space-between;
+  gap: 12px; background: linear-gradient(rgba(248, 81, 73, .18), rgba(248, 81, 73, .18)), var(--panel); }
 
 .card { background: var(--panel); border: 1px solid var(--border); border-radius: 8px; padding: 16px; margin-bottom: 16px; }
 .grid { display: grid; gap: 16px; }
