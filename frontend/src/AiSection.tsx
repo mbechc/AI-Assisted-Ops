@@ -115,7 +115,7 @@ export default function AiSection() {
       <p className="small muted">
         Optional for every Expert Task: all tasks work on rules alone, and AI never executes a change. With AI on,
         AI-capable tasks get a second opinion on proposals, learn naming conventions, recognise site renames and write
-        summaries. See <a href="https://github.com/mbechc/AI-Assisted-Ops/blob/main/docs/AI_USAGE.md" target="_blank" rel="noreferrer">AI usage</a>.
+        summaries. See <a href="https://github.com/mbechc/AI-Assisted-Ops/blob/master/docs/AI_USAGE.md" target="_blank" rel="noreferrer">AI usage</a>.
       </p>
       <ErrorLine error={err || st.error} />
       {local.updater_stale && (
