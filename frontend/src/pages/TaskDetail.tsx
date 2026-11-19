@@ -59,7 +59,7 @@ export default function TaskDetail() {
           </p>
         </div>
         <div className="row">
-          <Link to={`/review?task=${t.key}`}><button>Review queue ({t.counts.proposed || 0})</button></Link>
+          <Link to={`/review?task=${t.key}&status=proposed`}><button>Review queue ({t.counts.proposed || 0})</button></Link>
           {can("operator") && <button className="primary" onClick={runNow}>Run now</button>}
         </div>
       </div>

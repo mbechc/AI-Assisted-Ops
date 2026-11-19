@@ -1,52 +1,61 @@
 import React, { Fragment, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useAuth } from "../App";
-import { api, fmtDate, qs } from "../api";
+import { api, fmtDate, qsMulti } from "../api";
 import { Confidence, Drawer, ErrorLine, Pager, Status, useAsync } from "../components";
-import { Group, Site, Task, WorkItem } from "../types";
+import FilterBar, { filterOptions } from "../FilterBar";
+import { Filter, filtersToApi, filtersToDecide, filtersToQuery, parseFilters, upsert } from "../reviewFilters";
+import { Facets, Group, Site, Task, WorkItem } from "../types";
 
 const LIMIT = 100;
 
 export default function Review() {
   const [sp, setSp] = useSearchParams();
   const tasks = useAsync(() => api.get<Task[]>("/tasks"), []);
-  const taskKey = sp.get("task") || tasks.data?.[0]?.key || "";
-  const task = tasks.data?.find((t) => t.key === taskKey);
+  const filters = useMemo(() => parseFilters(sp), [sp]);
+  const q = sp.get("q") || "";
+  const apiParams = useMemo(() => filtersToApi(filters, q), [filters, q]);
+  const key = JSON.stringify(apiParams);
   const [view, setView] = useState<"groups" | "list">("groups");
-  const [status, setStatus] = useState(sp.get("status") || "proposed");
-  const [group, setGroup] = useState<string | null>(null);
-  const [minC, setMinC] = useState("");
-  const [maxC, setMaxC] = useState("");
-  const [q, setQ] = useState("");
   const [offset, setOffset] = useState(0);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [openItem, setOpenItem] = useState<number | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
 
-  useEffect(() => { setOffset(0); setSelected(new Set()); }, [taskKey, status, group, minC, maxC, q]);
+  useEffect(() => { setOffset(0); setSelected(new Set()); }, [key]);
 
-  const groups = useAsync(
-    () => (taskKey ? api.get<{ threshold: number; groups: Group[] }>(`/items/groups${qs({ task_key: taskKey, status })}`) : Promise.resolve(null)),
-    [taskKey, status], 20000);
+  const facets = useAsync(() => api.get<Facets>(`/review/facets${qsMulti(apiParams)}`), [key], 20000);
+  const groups = useAsync(() => api.get<{ groups: Group[] }>(`/items/groups${qsMulti(apiParams)}`), [key], 20000);
   const items = useAsync(
-    () => (taskKey ? api.get<{ total: number; items: WorkItem[] }>(`/items${qs({
-      task_key: taskKey, status, group: group ?? undefined, min_confidence: minC, max_confidence: maxC, q, limit: LIMIT, offset,
-    })}`) : Promise.resolve(null)),
-    [taskKey, status, group, minC, maxC, q, offset], 20000);
+    () => api.get<{ total: number; items: WorkItem[] }>(`/items${qsMulti({ ...apiParams, limit: LIMIT, offset })}`),
+    [key, offset], 20000);
 
-  const refresh = () => { groups.reload(); items.reload(); };
+  const setFilters = (f: Filter[], text: string) => setSp(new URLSearchParams(filtersToQuery(f, text)));
+  const refresh = () => { groups.reload(); items.reload(); facets.reload(); };
+  const { label } = filterOptions(facets.data, tasks.data || []);
+  const sourceCount = (facets.data?.sources || []).filter((s) => s.id !== null).length;
+  const taskName = (k: string) => label("task", k);
+  const sourceName = (id: number | null) => (id === null ? "(deleted)" : label("source", String(id)));
 
-  const decide = async (body: Record<string, unknown>, label: string) => {
+  const decide = async (body: Record<string, unknown>, text: string) => {
     setErr(null);
     try {
       const r = await api.post<{ updated: number[]; errors: { id: number; error: string }[] }>("/items/decide", body);
-      setMsg(`${label}: ${r.updated.length} item(s).` + (r.errors.length ? ` ${r.errors.length} skipped (e.g. ${r.errors[0].error}).` : ""));
+      setMsg(`${text}: ${r.updated.length} item(s).` + (r.errors.length ? ` ${r.errors.length} skipped (e.g. ${r.errors[0].error}).` : ""));
       setSelected(new Set());
       refresh();
     } catch (e: any) {
       setErr(e.message);
     }
+  };
+
+  const openGroup = (g: Group) => {
+    let f = upsert(filters, { attr: "task", op: "is", values: [g.task_key] });
+    if (g.source_id !== null && sourceCount > 1) f = upsert(f, { attr: "source", op: "is", values: [String(g.source_id)] });
+    if (g.group !== null) f = upsert(f, { attr: "group", op: "is", values: [g.group] });
+    setFilters(f, q);
+    setView("list");
   };
 
   return (
@@ -56,58 +65,51 @@ export default function Review() {
           <h1>Review queue</h1>
           <p className="sub">Approve, override or reject what the recurring tasks propose. Decisions train the confidence calibration.</p>
         </div>
-        <div className="row">
-          <select value={taskKey} onChange={(e) => { setSp({ task: e.target.value }); setGroup(null); }}>
-            {(tasks.data || []).map((t) => <option key={t.key} value={t.key}>{t.name} ({t.counts.proposed || 0})</option>)}
-          </select>
-          <select value={status} onChange={(e) => setStatus(e.target.value)}>
-            <option value="proposed">Awaiting review</option>
-            <option value="approved,executing">Approved / executing</option>
-            <option value="done">Done</option>
-            <option value="failed">Failed</option>
-            <option value="rejected">Rejected</option>
-            <option value="superseded">Superseded</option>
-            <option value="reported">Reported (L0)</option>
-          </select>
-        </div>
       </div>
+      <FilterBar filters={filters} q={q} total={items.data?.total} facets={facets.data} tasks={tasks.data || []}
+        onChange={setFilters} />
       {msg && <div className="banner info">{msg}</div>}
-      <ErrorLine error={err || items.error || groups.error} />
+      <ErrorLine error={err || items.error || groups.error || facets.error} />
       <div className="tabs">
-        <button className={view === "groups" ? "active" : ""} onClick={() => setView("groups")}>By group</button>
+        <button className={view === "groups" ? "active" : ""} onClick={() => setView("groups")}>
+          By group ({groups.data?.groups.length ?? 0})
+        </button>
         <button className={view === "list" ? "active" : ""} onClick={() => setView("list")}>
-          Items{group ? `: ${group}` : ""} ({items.data?.total ?? 0})
+          Items ({items.data?.total ?? 0})
         </button>
       </div>
       {view === "groups" ? (
         <GroupsView
-          data={groups.data} status={status} taskKey={taskKey}
-          onOpen={(g) => { setGroup(g); setView("list"); }}
-          onBulk={(g, min) => decide({ decision: "approve", filter: { task_key: taskKey, group: g, min_confidence: min } }, `Approved ${g ?? "group"} >= ${min}`)}
+          groups={groups.data?.groups || null} taskName={taskName} sourceName={sourceName} showSource={sourceCount > 1}
+          onOpen={openGroup}
+          onBulk={(g, min) => decide({
+            decision: "approve",
+            filter: {
+              ...filtersToDecide(filters, q), task_key: [g.task_key], task_key_not: [],
+              source_id: g.source_id === null ? [] : [g.source_id], source_id_not: [],
+              group: g.group === null ? [] : [g.group], group_not: [], group_contains: null,
+              min_confidence: Math.max(min, Number(apiParams.min_confidence ?? 0)),
+            },
+          }, `Approved ${g.group ?? "group"} >= ${min}`)}
         />
       ) : (
         <div className="card">
           <div className="row" style={{ marginBottom: 10 }}>
-            {group !== null && <span className="badge info">{group} <button className="link" onClick={() => setGroup(null)}>x</button></span>}
-            <input placeholder="Search name or group" value={q} onChange={(e) => setQ(e.target.value)} />
-            <input style={{ width: 90 }} placeholder="Min conf" value={minC} onChange={(e) => setMinC(e.target.value)} />
-            <input style={{ width: 90 }} placeholder="Max conf" value={maxC} onChange={(e) => setMaxC(e.target.value)} />
+            <span className="muted small">
+              {selected.size ? `${selected.size} selected` : "Select items awaiting review to approve or reject them together."}
+            </span>
             <div className="spacer" />
-            {status === "proposed" && (
-              <BulkBar
-                selected={selected} task={task}
-                onApprove={() => decide({ decision: "approve", ids: [...selected] }, "Approved")}
-                onReject={(note) => decide({ decision: "reject", ids: [...selected], note }, "Rejected")}
-                onApproveFilter={() => decide({
-                  decision: "approve",
-                  filter: { task_key: taskKey, group, min_confidence: minC ? Number(minC) : undefined, max_confidence: maxC ? Number(maxC) : undefined },
-                }, "Approved all matching")}
-              />
-            )}
+            <BulkBar
+              selected={selected}
+              onApprove={() => decide({ decision: "approve", ids: [...selected] }, "Approved")}
+              onReject={(note) => decide({ decision: "reject", ids: [...selected], note }, "Rejected")}
+              onApproveFilter={() => decide({ decision: "approve", filter: filtersToDecide(filters, q) }, "Approved all matching")}
+            />
           </div>
           <ItemsTable
-            items={items.data?.items || []} selectable={status === "proposed"} selected={selected}
-            setSelected={setSelected} onOpen={setOpenItem}
+            items={items.data?.items || []} selected={selected} setSelected={setSelected} onOpen={setOpenItem}
+            taskName={taskName} sourceName={sourceName} showSource={sourceCount > 1}
+            showTask={(facets.data?.tasks.length ?? 0) > 1}
           />
           <Pager total={items.data?.total || 0} limit={LIMIT} offset={offset} onChange={setOffset} />
         </div>
@@ -117,46 +119,57 @@ export default function Review() {
   );
 }
 
-function GroupsView({ data, status, onOpen, onBulk }: {
-  data: { threshold: number; groups: Group[] } | null; status: string; taskKey: string;
-  onOpen: (g: string | null) => void; onBulk: (g: string | null, min: number) => void;
+function GroupsView({ groups, taskName, sourceName, showSource, onOpen, onBulk }: {
+  groups: Group[] | null; taskName: (k: string) => string; sourceName: (id: number | null) => string; showSource: boolean;
+  onOpen: (g: Group) => void; onBulk: (g: Group, min: number) => void;
 }) {
   const { can } = useAuth();
-  const [min, setMin] = useState<number | null>(null);
-  const threshold = min ?? data?.threshold ?? 95;
-  if (!data) return null;
+  const [min, setMin] = useState("");
+  if (!groups) return null;
+  const showTask = new Set(groups.map((g) => g.task_key)).size > 1;
+  const canBulk = can("operator");
+  const thr = (g: Group) => (min === "" ? g.threshold : Number(min));
   return (
     <div className="card">
-      {status === "proposed" && can("operator") && (
+      {canBulk && (
         <div className="row" style={{ marginBottom: 10 }}>
           <span className="muted small">Bulk approve threshold</span>
-          <input type="number" style={{ width: 80 }} value={threshold} onChange={(e) => setMin(Number(e.target.value))} />
-          <span className="muted small">Items needing a manual choice (blocked) are never bulk-approved.</span>
+          <input type="number" min={0} max={100} style={{ width: 90 }} placeholder="per task" value={min}
+            onChange={(e) => setMin(e.target.value)} />
+          <span className="muted small">
+            Empty uses each task's auto threshold. Only items awaiting review are approved; items needing a manual choice never are.
+          </span>
         </div>
       )}
       <table>
         <thead>
-          <tr><th>Group</th><th className="num">Items</th><th className="num">Avg conf.</th><th className="num">Range</th><th className="num">&gt;= threshold</th><th className="num">Need choice</th><th /></tr>
+          <tr>
+            <th>Group</th>{showTask && <th>Task</th>}{showSource && <th>Catalyst Center</th>}
+            <th className="num">Items</th><th className="num">Avg conf.</th><th className="num">Range</th>
+            <th className="num">&gt;= threshold</th><th className="num">Need choice</th><th />
+          </tr>
         </thead>
         <tbody>
-          {data.groups.map((g) => (
-            <tr key={g.group ?? "none"} className="click" onClick={() => onOpen(g.group)}>
+          {groups.map((g) => (
+            <tr key={`${g.task_key}|${g.source_id}|${g.group}`} className="click" onClick={() => onOpen(g)}>
               <td>{g.group ?? <span className="muted">none</span>}</td>
+              {showTask && <td className="small">{taskName(g.task_key)}</td>}
+              {showSource && <td className="small">{sourceName(g.source_id)}</td>}
               <td className="num">{g.count}</td>
               <td className="num"><Confidence value={Math.round(g.avg_confidence)} small /></td>
               <td className="num small muted">{g.min_confidence}-{g.max_confidence}</td>
               <td className="num">{g.above_threshold}</td>
               <td className="num">{g.blocked || ""}</td>
               <td className="num" onClick={(e) => e.stopPropagation()}>
-                {status === "proposed" && can("operator") && (
+                {canBulk && (
                   <button className="ok" onClick={() => {
-                    if (confirm(`Approve all items in "${g.group}" with confidence >= ${threshold}?`)) onBulk(g.group, threshold);
-                  }}>Approve &gt;= {threshold}</button>
+                    if (confirm(`Approve all items awaiting review in "${g.group ?? "none"}" (${taskName(g.task_key)}) with confidence >= ${thr(g)}?`)) onBulk(g, thr(g));
+                  }}>Approve &gt;= {thr(g)}</button>
                 )}
               </td>
             </tr>
           ))}
-          {!data.groups.length && <tr><td colSpan={7} className="muted">Nothing here.</td></tr>}
+          {!groups.length && <tr><td colSpan={9} className="muted">Nothing matches the filters.</td></tr>}
         </tbody>
       </table>
     </div>
@@ -164,7 +177,7 @@ function GroupsView({ data, status, onOpen, onBulk }: {
 }
 
 function BulkBar({ selected, onApprove, onReject, onApproveFilter }: {
-  selected: Set<number>; task?: Task; onApprove: () => void; onReject: (note: string) => void; onApproveFilter: () => void;
+  selected: Set<number>; onApprove: () => void; onReject: (note: string) => void; onApproveFilter: () => void;
 }) {
   const { can } = useAuth();
   if (!can("operator")) return null;
@@ -175,35 +188,47 @@ function BulkBar({ selected, onApprove, onReject, onApproveFilter }: {
         const note = prompt("Reason for rejection (used to improve the task):");
         if (note !== null) onReject(note);
       }}>Reject selected</button>
-      <button onClick={() => confirm("Approve every item matching the current filters (blocked items excluded)?") && onApproveFilter()}>
+      <button onClick={() => confirm("Approve every item awaiting review that matches the current filters (items needing a manual choice excluded)?") && onApproveFilter()}>
         Approve all matching
       </button>
     </>
   );
 }
 
-function ItemsTable({ items, selectable, selected, setSelected, onOpen }: {
-  items: WorkItem[]; selectable: boolean; selected: Set<number>; setSelected: (s: Set<number>) => void; onOpen: (id: number) => void;
+function ItemsTable({ items, selected, setSelected, onOpen, taskName, sourceName, showSource, showTask }: {
+  items: WorkItem[]; selected: Set<number>; setSelected: (s: Set<number>) => void; onOpen: (id: number) => void;
+  taskName: (k: string) => string; sourceName: (id: number | null) => string; showSource: boolean; showTask: boolean;
 }) {
-  const allSel = items.length > 0 && items.every((i) => selected.has(i.id));
+  const { can } = useAuth();
+  const selectable = can("operator") && items.some((i) => i.status === "proposed");
+  const open = items.filter((i) => i.status === "proposed");
+  const allSel = open.length > 0 && open.every((i) => selected.has(i.id));
   const toggle = (id: number) => {
     const s = new Set(selected);
     s.has(id) ? s.delete(id) : s.add(id);
     setSelected(s);
   };
+  const cols = 6 + (selectable ? 1 : 0) + (showSource ? 1 : 0) + (showTask ? 1 : 0);
   return (
     <table>
       <thead>
         <tr>
-          {selectable && <th><input type="checkbox" checked={allSel} onChange={() => setSelected(allSel ? new Set() : new Set(items.map((i) => i.id)))} /></th>}
-          <th>Target</th><th>Proposal</th><th>Confidence</th><th>Status</th><th>Notes</th><th>Updated</th>
+          {selectable && <th><input type="checkbox" checked={allSel} onChange={() => setSelected(allSel ? new Set() : new Set(open.map((i) => i.id)))} /></th>}
+          <th>Target</th>{showTask && <th>Task</th>}{showSource && <th>Catalyst Center</th>}
+          <th>Proposal</th><th>Confidence</th><th>Status</th><th>Notes</th><th>Updated</th>
         </tr>
       </thead>
       <tbody>
         {items.map((i) => (
           <tr key={i.id} className={`click ${selected.has(i.id) ? "selected" : ""}`} onClick={() => onOpen(i.id)}>
-            {selectable && <td onClick={(e) => e.stopPropagation()}><input type="checkbox" checked={selected.has(i.id)} onChange={() => toggle(i.id)} /></td>}
+            {selectable && (
+              <td onClick={(e) => e.stopPropagation()}>
+                {i.status === "proposed" && <input type="checkbox" checked={selected.has(i.id)} onChange={() => toggle(i.id)} />}
+              </td>
+            )}
             <td><b>{i.target_label}</b><div className="small muted">{i.group_label}</div></td>
+            {showTask && <td className="small">{taskName(i.task_key)}</td>}
+            {showSource && <td className="small">{sourceName(i.source_id ?? null)}</td>}
             <td className="small">{i.proposed || <span className="muted">-</span>}</td>
             <td><Confidence value={i.confidence} />{i.llm_status === "ok" && <span className="small muted" title="Reviewed by the local LLM"> AI</span>}</td>
             <td><Status value={i.status} />{i.decided_by === "auto" && <div className="small muted">auto</div>}</td>
@@ -213,7 +238,7 @@ function ItemsTable({ items, selectable, selected, setSelected, onOpen }: {
             <td className="small muted">{fmtDate(i.updated_at)}</td>
           </tr>
         ))}
-        {!items.length && <tr><td colSpan={7} className="muted">No items.</td></tr>}
+        {!items.length && <tr><td colSpan={cols} className="muted">No items match the filters.</td></tr>}
       </tbody>
     </table>
   );

@@ -122,6 +122,8 @@ export interface WorkItem {
 }
 
 export interface Group {
+  task_key: string;
+  source_id: number | null;
   group: string | null;
   count: number;
   avg_confidence: number;
@@ -129,6 +131,30 @@ export interface Group {
   max_confidence: number;
   above_threshold: number;
   blocked: number;
+  threshold: number;
+}
+
+export interface FacetValue {
+  value: string;
+  count: number;
+}
+
+export interface Facets {
+  sources: { id: number | null; name: string; count: number }[];
+  tasks: FacetValue[];
+  statuses: FacetValue[];
+  groups: FacetValue[];
+}
+
+export interface SavedFilter {
+  id: string;
+  name: string;
+  query: string;
+  owner: string;
+  shared: boolean;
+  saved_at: string;
+  mine: boolean;
+  can_delete: boolean;
 }
 
 export interface Source {

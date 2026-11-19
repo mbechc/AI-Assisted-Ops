@@ -104,6 +104,17 @@ export function qs(params: Record<string, string | number | boolean | undefined 
   return s ? `?${s}` : "";
 }
 
+/** Like qs, but array values become repeated parameters (source_id=1&source_id=2). */
+export function qsMulti(params: Record<string, string | number | boolean | (string | number)[] | undefined | null>): string {
+  const p = new URLSearchParams();
+  Object.entries(params).forEach(([k, v]) => {
+    if (Array.isArray(v)) v.forEach((x) => p.append(k, String(x)));
+    else if (v !== undefined && v !== null && v !== "") p.set(k, String(v));
+  });
+  const s = p.toString();
+  return s ? `?${s}` : "";
+}
+
 export function fmtDate(v?: string | null): string {
   if (!v) return "-";
   const d = new Date(v);

@@ -16,6 +16,7 @@ from app.framework.autonomy import effective_autonomy
 from app.framework.base import LEVEL_NAMES
 from app.framework.calibration import calibration
 from app.framework.runner import RunAlreadyActive, create_run, decide, ensure_task_configs
+from app.item_filter import ItemFilter, apply, item_filter
 from app.models import DataSource, TaskConfig, TaskRun, User, WorkItem
 
 router = APIRouter(tags=["tasks"])
@@ -31,14 +32,6 @@ class TaskConfigIn(BaseModel):
     auto_threshold: int | None = None
     max_auto_per_run: int | None = None
     params: dict | None = None
-
-
-class ItemFilter(BaseModel):
-    task_key: str
-    group: str | None = None
-    min_confidence: int | None = None
-    max_confidence: int | None = None
-    include_blocked: bool = False
 
 
 class DecisionIn(BaseModel):
@@ -246,34 +239,10 @@ def get_run(run_id: int, db: Session = Depends(get_db), _=Depends(current_user))
     return run_out(r, with_log=True)
 
 
-def _item_query(task_key: str | None, status: str | None, group: str | None, min_conf: int | None,
-                max_conf: int | None, q: str | None, blocked: bool | None):
-    stmt = select(WorkItem)
-    if task_key:
-        stmt = stmt.where(WorkItem.task_key == task_key)
-    if status:
-        stmt = stmt.where(WorkItem.status.in_(status.split(",")))
-    if group is not None:
-        stmt = stmt.where(WorkItem.group_label == group)
-    if min_conf is not None:
-        stmt = stmt.where(WorkItem.confidence >= min_conf)
-    if max_conf is not None:
-        stmt = stmt.where(WorkItem.confidence <= max_conf)
-    if q:
-        stmt = stmt.where(WorkItem.target_label.ilike(f"%{q}%") | WorkItem.group_label.ilike(f"%{q}%"))
-    if blocked is True:
-        stmt = stmt.where(WorkItem.blocked_reason.is_not(None))
-    elif blocked is False:
-        stmt = stmt.where(WorkItem.blocked_reason.is_(None))
-    return stmt
-
-
 @router.get("/items")
-def list_items(task_key: str | None = None, status: str | None = "proposed", group: str | None = None,
-               min_confidence: int | None = None, max_confidence: int | None = None, q: str | None = None,
-               blocked: bool | None = None, sort: str = "-confidence", limit: int = 100, offset: int = 0,
+def list_items(f: ItemFilter = Depends(item_filter), sort: str = "-confidence", limit: int = 100, offset: int = 0,
                db: Session = Depends(get_db), _=Depends(current_user)):
-    stmt = _item_query(task_key, status, group, min_confidence, max_confidence, q, blocked)
+    stmt = apply(select(WorkItem), f)
     total = db.scalar(select(func.count()).select_from(stmt.subquery()))
     col = {"confidence": WorkItem.confidence, "target": WorkItem.target_label,
            "updated": WorkItem.updated_at, "group": WorkItem.group_label}.get(sort.lstrip("-"), WorkItem.confidence)
@@ -283,20 +252,22 @@ def list_items(task_key: str | None = None, status: str | None = "proposed", gro
 
 
 @router.get("/items/groups")
-def item_groups(task_key: str, status: str = "proposed", db: Session = Depends(get_db), _=Depends(current_user)):
-    cfg = db.get(TaskConfig, task_key)
-    threshold = cfg.auto_threshold if cfg else 95
-    rows = db.execute(
-        select(WorkItem.group_label, func.count(), func.avg(WorkItem.confidence), func.min(WorkItem.confidence),
-               func.max(WorkItem.confidence),
-               func.sum(case((WorkItem.blocked_reason.is_(None) & (WorkItem.confidence >= threshold), 1), else_=0)),
-               func.sum(case((WorkItem.blocked_reason.is_not(None), 1), else_=0)))
-        .where(WorkItem.task_key == task_key, WorkItem.status.in_(status.split(",")))
-        .group_by(WorkItem.group_label).order_by(func.count().desc())).all()
-    return {"threshold": threshold, "groups": [
-        {"group": g, "count": c, "avg_confidence": round(float(a or 0), 1), "min_confidence": mn,
-         "max_confidence": mx, "above_threshold": int(at or 0), "blocked": int(bl or 0)}
-        for g, c, a, mn, mx, at, bl in rows]}
+def item_groups(f: ItemFilter = Depends(item_filter), db: Session = Depends(get_db), _=Depends(current_user)):
+    """Items per task, Catalyst Center and group; 'above threshold' uses each task's own auto threshold."""
+    thresholds = {c.task_key: c.auto_threshold for c in db.scalars(select(TaskConfig))}
+    threshold = case(*[(WorkItem.task_key == k, v) for k, v in thresholds.items()], else_=95) if thresholds else 95
+    stmt = apply(select(
+        WorkItem.task_key, WorkItem.source_id, WorkItem.group_label, func.count(), func.avg(WorkItem.confidence),
+        func.min(WorkItem.confidence), func.max(WorkItem.confidence),
+        func.sum(case((WorkItem.blocked_reason.is_(None) & (WorkItem.confidence >= threshold), 1), else_=0)),
+        func.sum(case((WorkItem.blocked_reason.is_not(None), 1), else_=0))), f)
+    rows = db.execute(stmt.group_by(WorkItem.task_key, WorkItem.source_id, WorkItem.group_label)
+                      .order_by(func.count().desc())).all()
+    return {"thresholds": thresholds, "groups": [
+        {"task_key": t, "source_id": s, "group": g, "count": c, "avg_confidence": round(float(a or 0), 1),
+         "min_confidence": mn, "max_confidence": mx, "above_threshold": int(at or 0), "blocked": int(bl or 0),
+         "threshold": thresholds.get(t, 95)}
+        for t, s, g, c, a, mn, mx, at, bl in rows]}
 
 
 @router.get("/items/summary")
@@ -399,10 +370,10 @@ def decide_items(body: DecisionIn, db: Session = Depends(get_db), user: User = D
     if body.ids:
         ids = body.ids
     elif body.filter:
-        f = body.filter
-        stmt = _item_query(f.task_key, "proposed", f.group, f.min_confidence, f.max_confidence, None,
-                           None if f.include_blocked else False)
-        ids = list(db.scalars(stmt.with_only_columns(WorkItem.id).limit(5000)).all())
+        f = body.filter.model_copy(update={"status": ["proposed"], "status_not": []})
+        if not f.include_blocked:
+            f.blocked = False
+        ids = list(db.scalars(apply(select(WorkItem.id), f).limit(5000)).all())
     else:
         raise HTTPException(400, "ids or filter required")
     if body.override and len(ids) != 1:
