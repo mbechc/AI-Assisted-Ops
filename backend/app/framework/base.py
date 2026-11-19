@@ -1,4 +1,4 @@
-"""Contracts every recurring task (use case) implements."""
+"""Contracts every Expert Task (use case) implements."""
 from __future__ import annotations
 
 import logging
@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 if TYPE_CHECKING:
     from app.connectors.catalyst_center import CatalystCenter
-    from app.llm.ollama import OllamaClient
+    from app.llm.base import LLMProvider
     from app.models import DataSource, WorkItem
 
 LEVEL_NAMES = {0: "L0 Report only", 1: "L1 Human review", 2: "L2 Auto above threshold", 3: "L3 Full autonomy"}
@@ -60,7 +60,7 @@ class ParamSpec:
 
 class RunContext:
     def __init__(self, db: Session, task_key: str, source: DataSource | None, params: dict,
-                 run_id: int | None = None, llm: OllamaClient | None = None):
+                 run_id: int | None = None, llm: LLMProvider | None = None):
         self.db = db
         self.task_key = task_key
         self.source = source
@@ -119,6 +119,9 @@ class TaskDefinition(ABC):
     action_types: dict[str, str] = {}
     params: list[ParamSpec] = []
     llm_system_prompt: str = ""
+    # AI features (key -> short description). Every feature has a rule-based fallback, so a task with
+    # features is "AI Capable" with AI off and "AI Assisted" with a provider. Empty: no AI label.
+    ai_features: dict[str, str] = {}
 
     def default_params(self) -> dict:
         return {p.key: p.default for p in self.params}

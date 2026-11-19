@@ -1,4 +1,5 @@
 """Small key/value helpers for global settings and cached collector data."""
+import copy
 from datetime import datetime, timedelta, timezone
 from typing import Any
 
@@ -9,13 +10,19 @@ from app.models import CacheEntry, Setting
 DEFAULT_SETTINGS: dict[str, Any] = {
     "kill_switch": False,
     "global_autonomy_cap": 1,
+    "ai_mode": "none",
+}
+# Stored like DEFAULT_SETTINGS but not part of GET /settings (secrets live here, encrypted).
+PRIVATE_DEFAULTS: dict[str, Any] = {
+    "ai_cloud": {"endpoint": "", "deployment": "", "api_version": "2024-10-21", "auth": "api_key",
+                 "tenant_id": "", "client_id": "", "api_key_enc": None, "client_secret_enc": None},
 }
 
 
 def get_setting(db: Session, key: str) -> Any:
     row = db.get(Setting, key)
     if row is None:
-        return DEFAULT_SETTINGS.get(key)
+        return copy.deepcopy(DEFAULT_SETTINGS.get(key, PRIVATE_DEFAULTS.get(key)))
     return row.value.get("v")
 
 
@@ -48,3 +55,4 @@ def cache_set(db: Session, key: str, value: Any, ttl_seconds: int) -> None:
     else:
         row.value = value
         row.expires_at = expires
+    db.flush()

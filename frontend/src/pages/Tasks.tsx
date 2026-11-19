@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../App";
 import { api, fmtDate } from "../api";
-import { ErrorLine, Level, Status, useAsync } from "../components";
+import { AiLabel, ErrorLine, Level, Status, useAsync } from "../components";
 import { describeCron } from "../cron";
 import { Run, Task } from "../types";
 
@@ -34,8 +34,12 @@ export default function Tasks() {
     <>
       <div className="page-head">
         <div>
-          <h1>Recurring tasks</h1>
-          <p className="sub">Every use case is a recurring task that produces work items with a confidence score.</p>
+          <h1>Expert Tasks</h1>
+          <p className="sub">
+            Every use case is an Expert Task that runs on a schedule and produces work items with a confidence score.
+            <span className="badge ai" style={{ margin: "0 4px 0 8px" }}>AI Capable</span>runs on rules, AI off;
+            <span className="badge ai-on" style={{ margin: "0 4px 0 8px" }}>AI Assisted</span>uses the AI selected in Settings.
+          </p>
         </div>
       </div>
       {msg && <div className="banner info">{msg} <Link to="/runs">Run history</Link></div>}
@@ -54,6 +58,7 @@ export default function Tasks() {
                   <tr key={t.key}>
                     <td>
                       <Link to={`/tasks/${t.key}`}><b>{t.name}</b></Link>
+                      <AiLabel features={t.ai_features} mode={t.ai_mode} style={{ marginLeft: 6 }} />
                       {!t.config.enabled && <span className="badge muted" style={{ marginLeft: 6 }}>disabled</span>}
                       <div className="small muted" style={{ maxWidth: 520 }}>{t.description}</div>
                     </td>

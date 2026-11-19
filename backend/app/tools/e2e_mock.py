@@ -6,6 +6,7 @@ The first simulator runs without GeoIP, the second with the simulator's GeoIP da
 GeoIP-less and the GeoIP-assisted paths are exercised.
 
     python -m app.tools.e2e_mock --password <admin password> [--llm-items 10] [--approve 40]
+                                 [--ai-mode none|local|cloud]   # run once per AI mode chosen under Settings
 """
 import argparse
 import json
@@ -261,7 +262,15 @@ def check_ap_site(p: Portal, c: Check, src: dict, url: str, args, geo: bool):
         c.expect(with_geo > 0, "GeoIP contributes votes when configured", "no GeoIP votes despite an active database")
     else:
         c.expect(with_geo == 0, "no GeoIP votes without a GeoIP source", "GeoIP votes without a GeoIP source")
-    info(f"LLM review status: {dict(Counter(i['llm_status'] for i in its))}")
+    llm = Counter(i["llm_status"] for i in its)
+    info(f"LLM review status: {dict(llm)}")
+    if args.ai_mode == "none":
+        c.expect(set(llm) <= {"off"}, "No AI: every proposal is rule-based (AI review off)",
+                 f"AI review statuses in No AI mode: {dict(llm)}")
+    elif args.ai_mode in ("local", "cloud"):
+        reviewed = [i for i in its if i["llm_status"] == "ok"]
+        c.expect(reviewed and all(i.get("llm_provider") == args.ai_mode for i in reviewed),
+                 f"{args.ai_mode} AI reviewed {len(reviewed)} proposals", f"no {args.ai_mode} AI reviews: {dict(llm)}")
 
     approve = [i for i in sorted(its, key=lambda x: -x["confidence"]) if not i["blocked_reason"]][: args.approve]
     res = approve_and_wait(p, [i["id"] for i in approve], args.timeout)
@@ -452,6 +461,21 @@ def check_source(p: Portal, c: Check, src: dict, geo: dict, args):
         p.send("PUT", f"/api/sources/{src['id']}", {**body, "enabled": False})
 
 
+def check_ai(p: Portal, c: Check, args) -> None:
+    st = p.get("/api/settings/ai")
+    eff = st["effective_mode"]
+    info(f"AI mode: selected {st['mode']}, effective {eff}, local LLM {st['local'].get('state')}")
+    if args.ai_mode != "any":
+        c.expect(eff == args.ai_mode, f"effective AI mode is {eff}", f"effective AI mode {eff}, expected {args.ai_mode}")
+    tasks = p.get("/api/tasks")
+    labelled = [t["name"] for t in tasks if t["ai_features"]]
+    c.expect(labelled and all(t["ai_mode"] == eff for t in tasks),
+             f"AI labels on {len(labelled)} Expert Tasks ({'AI Capable' if eff == 'none' else eff + ' AI Assisted'})",
+             "task AI labels do not match the effective mode")
+    shift = p.get("/api/digest/shift?hours=24")
+    c.expect(bool(shift["lines"]), "shift summary available (template)", "shift summary empty")
+
+
 def main() -> int:
     ap = argparse.ArgumentParser()
     ap.add_argument("--url", default="https://web")
@@ -460,12 +484,15 @@ def main() -> int:
     ap.add_argument("--llm-items", type=int, default=10, help="LLM reviews per run (CPU inference is slow)")
     ap.add_argument("--approve", type=int, default=40, help="high-confidence AP site items to approve and execute")
     ap.add_argument("--timeout", type=int, default=3600)
+    ap.add_argument("--ai-mode", choices=("none", "local", "cloud", "any"), default="any",
+                    help="expected effective AI mode (set it under Settings first); 'any' only reports it")
     args = ap.parse_args()
 
     p = Portal(args.url, args.username, args.password)
     c = Check()
     c.ok(f"logged in to {args.url} as {args.username}")
     check_platform(p, c)
+    check_ai(p, c, args)
     sources = sorted((s for s in p.get("/api/sources") if s["name"] in MOCKS), key=lambda s: s["name"])
     if len(sources) != len(MOCKS):
         c.fail("mock sources not found; install with --with-mock")

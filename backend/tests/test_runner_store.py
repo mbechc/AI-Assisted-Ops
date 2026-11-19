@@ -22,6 +22,52 @@ def test_long_fingerprints_fit_the_column(mock_cc):
     db.close()
 
 
+class _Provider:
+    def __init__(self, name, fail=False):
+        self.name, self.label, self.fail, self.calls = name, f"{name} AI", fail, 0
+
+    def review(self, system, prompt):
+        self.calls += 1
+        if self.fail:
+            from app.llm.base import LLMUnavailable
+            raise LLMUnavailable("quota")
+        return {"confidence": 70, "rationale": "ok", "concerns": []}
+
+
+def _proposals(n=3):
+    from app.framework.base import Proposal
+    return [Proposal(target_key=f"t{i}", target_label=f"t{i}", action_type="report", payload={},
+                     rule_confidence=60, evidence=[], rationale="", llm_prompt="evidence", fingerprint=f"f{i}")
+            for i in range(n)]
+
+
+@pytest.mark.parametrize("mode", ["none", "local", "cloud"])
+def test_llm_review_per_mode(mode):
+    defn = type("D", (), {"llm_system_prompt": "sys"})()
+    ctx = type("C", (), {"params": {}, "log": lambda self, m: None})()
+    ctx.llm = None if mode == "none" else _Provider(mode)
+    res = runner._llm_review(ctx, defn, _proposals(), {})
+    if mode == "none":
+        assert {r["status"] for r in res.values()} == {"off"}
+        return
+    assert {r["status"] for r in res.values()} == {"ok"} and ctx.llm_stats["llm_provider"] == mode
+    prev = {"t0": WorkItem(target_key="t0", llm_status="ok", fingerprint="f0", llm_provider=mode, llm_confidence=70,
+                           rationale="r", concerns=[])}
+    other = "cloud" if mode == "local" else "local"
+    ctx.llm = _Provider(mode)
+    assert runner._llm_review(ctx, defn, _proposals(), prev)["t0"].get("reused")
+    ctx.llm = _Provider(other)
+    assert not runner._llm_review(ctx, defn, _proposals(), prev)["t0"].get("reused"), "reuse needs the same provider"
+
+
+def test_llm_unavailable_falls_back_to_rules():
+    defn = type("D", (), {"llm_system_prompt": "sys"})()
+    ctx = type("C", (), {"params": {}, "log": lambda self, m: None})()
+    ctx.llm = _Provider("cloud", fail=True)
+    res = runner._llm_review(ctx, defn, _proposals(), {})
+    assert {r["status"] for r in res.values()} == {"unavailable"} and ctx.llm.calls == 1
+
+
 @pytest.mark.parametrize("mock_cc", ["2.3.5.6"], indirect=True)
 def test_worker_start_fails_only_its_orphaned_runs(mock_cc):
     db, defn, cfg, ctx = setup_task(mock_cc, "site_hierarchy_drift")

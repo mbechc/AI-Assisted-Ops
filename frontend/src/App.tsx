@@ -138,7 +138,7 @@ function Shell() {
           <NavLink to="/review">
             Review queue {pending > 0 && <span className="count">{pending}</span>}
           </NavLink>
-          <NavLink to="/tasks">Recurring tasks</NavLink>
+          <NavLink to="/tasks">Expert Tasks</NavLink>
           <NavLink to="/runs">Run history</NavLink>
           <NavLink to="/runners">Runners</NavLink>
           {can("admin") && <NavLink to="/logs">Container logs</NavLink>}

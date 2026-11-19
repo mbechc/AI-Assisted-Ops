@@ -12,5 +12,5 @@ if [[ " $* " != *" --password "* ]]; then
   [ -r "$pwfile" ] || die "pass --password (no $pwfile)"
   args+=(--password "$(sed -n 2p "$pwfile")")
 fi
-[ "$(env_get COMPOSE_PROFILES)" = "mock" ] || die "simulators not enabled; re-run install.sh --with-mock"
+profile_has mock || die "simulators not enabled; re-run install.sh --with-mock"
 compose exec -T api python -m app.tools.e2e_mock "${args[@]}"

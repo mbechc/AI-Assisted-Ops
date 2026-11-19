@@ -103,7 +103,8 @@ class WorkItem(Base):
     confidence: Mapped[int] = mapped_column(Integer, default=0, index=True)
     rule_confidence: Mapped[int] = mapped_column(Integer, default=0)
     llm_confidence: Mapped[int | None] = mapped_column(Integer, nullable=True)
-    llm_status: Mapped[str] = mapped_column(String(16), default="skipped")  # skipped|ok|error|unavailable
+    llm_status: Mapped[str] = mapped_column(String(16), default="skipped")  # off|skipped|ok|error|unavailable
+    llm_provider: Mapped[str | None] = mapped_column(String(16), nullable=True)  # local|cloud
     fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
     evidence: Mapped[list] = mapped_column(JSON, default=list)
     rationale: Mapped[str] = mapped_column(Text, default="")

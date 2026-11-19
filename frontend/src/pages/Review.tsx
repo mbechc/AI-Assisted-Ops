@@ -63,7 +63,7 @@ export default function Review() {
       <div className="page-head">
         <div>
           <h1>Review queue</h1>
-          <p className="sub">Approve, override or reject what the recurring tasks propose. Decisions train the confidence calibration.</p>
+          <p className="sub">Approve, override or reject what the Expert Tasks propose. Decisions train the confidence calibration.</p>
         </div>
       </div>
       <FilterBar filters={filters} q={q} total={items.data?.total} facets={facets.data} tasks={tasks.data || []}
@@ -230,7 +230,7 @@ function ItemsTable({ items, selected, setSelected, onOpen, taskName, sourceName
             {showTask && <td className="small">{taskName(i.task_key)}</td>}
             {showSource && <td className="small">{sourceName(i.source_id ?? null)}</td>}
             <td className="small">{i.proposed || <span className="muted">-</span>}</td>
-            <td><Confidence value={i.confidence} />{i.llm_status === "ok" && <span className="small muted" title="Reviewed by the local LLM"> AI</span>}</td>
+            <td><Confidence value={i.confidence} />{i.llm_status === "ok" && <span className="small muted" title={`Reviewed by ${i.llm_provider === "cloud" ? "Azure OpenAI" : "the local LLM"}`}> AI</span>}</td>
             <td><Status value={i.status} />{i.decided_by === "auto" && <div className="small muted">auto</div>}</td>
             <td className="small">
               {i.blocked_reason ? <span className="badge warn">needs choice</span> : i.concerns?.length ? <span className="muted">{i.concerns.length} concern(s)</span> : ""}
@@ -262,7 +262,8 @@ function PayloadDetails({ item: i }: { item: WorkItem }) {
       break;
     case "rename_ap":
       rows.push(["Current name", p.hostname], ["New name", <b>{o.hostname_new || p.hostname_new}</b>],
-        ["Method", p.method === "history" ? "earlier name from inventory history" : "floor naming convention"],
+        ["Method", p.method === "history" ? "earlier name from inventory history"
+          : p.method === "ai_template" ? "floor naming template learned by AI (validated)" : "floor naming convention"],
         ["Site", p.site || "-"], ["MAC", p.mac || "-"]);
       break;
     case "set_role":
@@ -286,6 +287,15 @@ function PayloadDetails({ item: i }: { item: WorkItem }) {
   if (p.auto_eligible === false && i.action_type !== "report") rows.push(["Automation", <span className="badge warn">never auto-executed</span>]);
   return <div className="kv">{rows.map(([k, v], n) => <Fragment key={n}><div className="k">{k}</div><div>{v}</div></Fragment>)}</div>;
 }
+
+const LLM_STATUS_TEXT: Record<string, string> = {
+  skipped: "not reviewed", unavailable: "AI unavailable", error: "AI error",
+};
+const LLM_STATUS_HELP: Record<string, string> = {
+  skipped: "AI reviews only proposals of AI-capable tasks inside the task's confidence band, up to the per-run budget.",
+  unavailable: "The AI provider could not be reached during this run; the rule-based confidence was used.",
+  error: "The AI answer could not be used; the rule-based confidence was used.",
+};
 
 function ItemDrawer({ id, onClose, onDecided }: { id: number; onClose: () => void; onDecided: (msg: string) => void }) {
   const { can } = useAuth();
@@ -338,7 +348,14 @@ function ItemDrawer({ id, onClose, onDecided }: { id: number; onClose: () => voi
           <div className="grid cols-4" style={{ margin: "14px 0" }}>
             <div><div className="small muted">Confidence</div><Confidence value={i.confidence} /></div>
             <div><div className="small muted">Rule-based</div><Confidence value={i.rule_confidence} small /></div>
-            <div><div className="small muted">Local LLM</div>{i.llm_status === "ok" ? <Confidence value={i.llm_confidence} small /> : <span className="muted small">{i.llm_status}</span>}</div>
+            {i.llm_status !== "off" && (
+              <div>
+                <div className="small muted">AI review{i.llm_provider && ` (${i.llm_provider === "local" ? "Local" : "Cloud"})`}</div>
+                {i.llm_status === "ok" ? <Confidence value={i.llm_confidence} small />
+                  : <span className={`small ${i.llm_status === "unavailable" || i.llm_status === "error" ? "err" : "muted"}`}
+                    title={LLM_STATUS_HELP[i.llm_status]}>{LLM_STATUS_TEXT[i.llm_status] || i.llm_status}</span>}
+              </div>
+            )}
             <div><div className="small muted">Status</div><Status value={i.status} /></div>
           </div>
           <div className="card">

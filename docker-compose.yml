@@ -78,13 +78,19 @@ services:
       retries: 10
     logging: *logging
 
+  # Local LLM (profile "llm"): never pulled or started by the installer. An admin enables it under
+  # Settings > AI assistance; the host updater then adds "llm" to COMPOSE_PROFILES and pulls the model.
   ollama:
     image: ollama/ollama:0.40.16
+    profiles: ["llm"]
     restart: unless-stopped
     environment:
       OLLAMA_NUM_PARALLEL: ${OLLAMA_NUM_PARALLEL:-1}
       OLLAMA_MAX_LOADED_MODELS: "1"
       OLLAMA_KEEP_ALIVE: "24h"
+      # `ollama pull` runs inside the container: pass the appliance proxy (if any) from .env.
+      HTTPS_PROXY: ${HTTPS_PROXY:-}
+      NO_PROXY: ${NO_PROXY:-}
     volumes:
       - ollama:/root/.ollama
     networks: [internal]

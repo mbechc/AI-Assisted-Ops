@@ -14,7 +14,8 @@ from app.framework import registry
 from app.framework.autonomy import effective_autonomy
 from app.framework.base import Proposal, RunContext, TaskDefinition
 from app.framework.confidence import combine
-from app.llm.ollama import LLMUnavailable, OllamaClient
+from app.llm.base import LLMUnavailable
+from app.llm.factory import get_provider
 from app.logging_setup import log_context
 from app.models import DataSource, TaskConfig, TaskRun, WorkItem
 from app.store import get_setting
@@ -77,7 +78,9 @@ def _llm_review(ctx: RunContext, defn: TaskDefinition, proposals: list[Proposal]
     lo, hi = int(params.get("llm_min_confidence", 35)), int(params.get("llm_max_confidence", 90))
     budget = int(params.get("llm_max_items", 150))
     results: dict[str, dict] = {}
-    if not params.get("llm_enabled", True) or ctx.llm is None:
+    if ctx.llm is None:
+        return {p.target_key: {"status": "off"} for p in proposals}
+    if not params.get("llm_enabled", True):
         return results
 
     eligible = [p for p in proposals if p.llm_prompt and lo <= p.rule_confidence <= hi]
@@ -86,26 +89,32 @@ def _llm_review(ctx: RunContext, defn: TaskDefinition, proposals: list[Proposal]
     unavailable = False
     for p in eligible:
         prev = previous.get(p.target_key)
-        if prev and prev.llm_status == "ok" and p.fingerprint and prev.fingerprint == p.fingerprint:
+        if (prev and prev.llm_status == "ok" and p.fingerprint and prev.fingerprint == p.fingerprint
+                and (prev.llm_provider or ctx.llm.name) == ctx.llm.name):
             results[p.target_key] = {"status": "ok", "confidence": prev.llm_confidence,
                                      "rationale": prev.rationale, "concerns": prev.concerns, "reused": True}
             reused += 1
             continue
-        if unavailable or called >= budget:
+        if unavailable:
+            results[p.target_key] = {"status": "unavailable"}
+            continue
+        if called >= budget:
             continue
         try:
             out = ctx.llm.review(defn.llm_system_prompt, p.llm_prompt)
             results[p.target_key] = {"status": "ok", **out}
             called += 1
         except LLMUnavailable as exc:
-            ctx.log(f"LLM unavailable, continuing with rule-based confidence only: {exc}")
+            ctx.log(f"{ctx.llm.label} unavailable, continuing with rule-based confidence only: {exc}")
             unavailable = True
+            results[p.target_key] = {"status": "unavailable"}
         except Exception as exc:  # noqa: BLE001 - a bad LLM answer must not fail the run
             results[p.target_key] = {"status": "error", "error": str(exc)}
             called += 1
-    ctx.log(f"LLM review: {called} new, {reused} reused, {len(eligible)} eligible (band {lo}-{hi}, budget {budget})")
-    ctx.llm_stats = {"llm_reviewed": called, "llm_reused": reused, "llm_eligible": len(eligible),
-                     "llm_unavailable": unavailable}
+    ctx.log(f"{ctx.llm.label} review: {called} new, {reused} reused, {len(eligible)} eligible "
+            f"(band {lo}-{hi}, budget {budget})")
+    ctx.llm_stats = {"llm_provider": ctx.llm.name, "llm_reviewed": called, "llm_reused": reused,
+                     "llm_eligible": len(eligible), "llm_unavailable": unavailable}
     return results
 
 
@@ -151,7 +160,7 @@ def _execute_run(run_id: int) -> None:
         cfg = db.get(TaskConfig, run.task_key)
         source = resolve_source(db, defn, cfg)
         run.source_id = source.id if source else None
-        ctx = RunContext(db, defn.key, source, dict(cfg.params or {}), run_id=run.id, llm=OllamaClient())
+        ctx = RunContext(db, defn.key, source, dict(cfg.params or {}), run_id=run.id, llm=get_provider(db))
         try:
             if source is None:
                 raise RuntimeError(f"no enabled {defn.source_kind} data source configured")
@@ -223,11 +232,13 @@ def _store_results(db: Session, ctx: RunContext, defn: TaskDefinition, cfg: Task
         item.fingerprint = p.fingerprint
         if llm and llm["status"] == "ok":
             item.llm_status, item.llm_confidence = "ok", int(llm["confidence"])
+            item.llm_provider = ctx.llm.name if ctx.llm else None
             item.rationale = llm["rationale"] or p.rationale
             item.concerns = list(dict.fromkeys(p.concerns + list(llm.get("concerns") or [])))
         else:
             item.llm_status = llm["status"] if llm else "skipped"
             item.llm_confidence = None
+            item.llm_provider = None
             item.rationale = p.rationale
             item.concerns = p.concerns
         item.confidence = combine(item.rule_confidence, item.llm_confidence)

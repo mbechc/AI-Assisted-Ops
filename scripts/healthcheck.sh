@@ -1,6 +1,8 @@
 #!/usr/bin/env bash
 # Post-install / support self-test. Exit code 0 when the system is fully operational.
-#   --allow-no-model   do not fail when the LLM model has not been pulled
+# The AI check follows Settings > AI assistance: nothing for No AI, the ollama model for Local LLM,
+# a probe request for Azure OpenAI.
+#   --allow-no-model   do not fail while the Local LLM is still being installed (or failed to install)
 set -uo pipefail
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
 

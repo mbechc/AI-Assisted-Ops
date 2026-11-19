@@ -18,14 +18,14 @@ if [ "$purge" = 1 ]; then
   c_warn "This deletes ALL AIOps data (database, LLM model, configuration) in $INSTALL_DIR"
   read -r -p "Type 'purge' to continue: " ans
   [ "$ans" = "purge" ] || die "aborted"
-  images="$(COMPOSE_PROFILES=mock compose config --images 2>/dev/null | sort -u || true)"
-  COMPOSE_PROFILES=mock compose down -v --remove-orphans
+  images="$(COMPOSE_PROFILES=mock,llm compose config --images 2>/dev/null | sort -u || true)"
+  COMPOSE_PROFILES=mock,llm compose down -v --remove-orphans
   # shellcheck disable=SC2086
   [ -n "$images" ] && docker image rm $images >/dev/null 2>&1 || true
   remove_updater
   rm -rf "$INSTALL_DIR"
   c_ok "AIOps removed completely"
 else
-  COMPOSE_PROFILES=mock compose down --remove-orphans
+  COMPOSE_PROFILES=mock,llm compose down --remove-orphans
   c_ok "AIOps stopped and containers removed (data kept; start again with: docker compose up -d in $INSTALL_DIR)"
 fi

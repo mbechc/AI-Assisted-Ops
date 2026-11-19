@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../App";
 import { api } from "../api";
@@ -86,6 +87,61 @@ export default function Dashboard() {
         })}
       </div>
       {kpis.data && !all.length && <p className="muted">No review categories.</p>}
+      <ShiftCard />
     </>
+  );
+}
+
+interface Shift {
+  hours: number;
+  lines: string[];
+  ai_mode: string;
+  ai: null | { provider_label: string; narrative: string | null; rejected_reason: string | null; generated_at: string };
+}
+
+function ShiftCard() {
+  const { can } = useAuth();
+  const [hours, setHours] = useState(12);
+  const shift = useAsync(() => api.get<Shift>(`/digest/shift?hours=${hours}`), [hours], 60000);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const s = shift.data;
+  const write = async () => {
+    setBusy(true);
+    setErr(null);
+    try {
+      shift.setData(await api.post<Shift>("/digest/shift/ai", { hours }));
+    } catch (e: any) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const aiOn = s && s.ai_mode !== "none";
+  return (
+    <div className="card" style={{ marginTop: 16 }}>
+      <div className="row" style={{ justifyContent: "space-between" }}>
+        <h2 style={{ margin: 0 }}>Since last shift
+          {aiOn && <span className="badge ai-on" style={{ marginLeft: 8 }}>{s!.ai_mode === "local" ? "Local AI" : "Cloud AI"}</span>}
+        </h2>
+        <div className="row">
+          <select value={hours} onChange={(e) => setHours(Number(e.target.value))}>
+            {[8, 12, 24].map((h) => <option key={h} value={h}>Last {h} hours</option>)}
+          </select>
+          {aiOn && can("operator") && !s!.ai?.narrative && (
+            <button disabled={busy} onClick={write}>{busy ? "Writing..." : "Write summary with AI"}</button>
+          )}
+        </div>
+      </div>
+      <ErrorLine error={err || shift.error} />
+      {s?.ai?.narrative && (
+        <>
+          <p style={{ marginTop: 10 }}>{s.ai.narrative}</p>
+          <p className="small muted">Written by {s.ai.provider_label} from the facts below.</p>
+        </>
+      )}
+      {s?.ai?.rejected_reason && <div className="banner warn">{s.ai.rejected_reason}</div>}
+      {s && <ul className={s.ai?.narrative ? "small muted" : ""} style={{ marginTop: 10 }}>{s.lines.map((l, i) => <li key={i}>{l}</li>)}</ul>}
+    </div>
   );
 }

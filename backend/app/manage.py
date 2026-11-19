@@ -118,8 +118,10 @@ def cmd_selftest(args) -> int:
     from sqlalchemy import text
     from app.config import get_settings
     from app.db import engine
+    from app.db import session_scope
     from app.framework import registry
-    from app.llm.ollama import OllamaClient
+    from app.llm.base import PROBE_SCHEMA
+    from app.llm.factory import provider_for, requested_mode
 
     ok = True
 
@@ -137,22 +139,30 @@ def cmd_selftest(args) -> int:
             v = c.execute(text("select version_num from alembic_version")).scalar()
         return f"schema {v}"
 
-    def llm_check():
-        st = OllamaClient().status()
-        if not st["reachable"]:
-            raise RuntimeError(st.get("error"))
-        if not st["model_present"]:
-            if args.allow_no_model:
-                return f"WARNING model {st['model']} not pulled; rule-based confidence only"
-            raise RuntimeError(f"model {st['model']} not pulled (present: {st['models']})")
+    def ai_check():
+        """Only the provider selected in Settings > AI assistance is tested; No AI has nothing to test."""
+        with session_scope() as db:
+            mode = requested_mode(db)
+            provider = provider_for(db, mode)
+        if provider is None:
+            return "No AI (rules only)"
+        if mode == "local":
+            from app.updates import llm_state
+            st = llm_state()
+            if st["state"] != "ready":
+                if args.allow_no_model:
+                    return f"WARNING local LLM is {st['state']}; rule-based confidence only"
+                raise RuntimeError(f"local LLM is {st['state']}" + (f": {st['error']}" if st.get("error") else ""))
+        st = provider.status()
+        if not st.get("ready"):
+            raise RuntimeError(st.get("error") or "not ready")
         if args.llm_probe:
-            OllamaClient().chat_json("Reply with JSON.", 'Return {"ok": true}',
-                                     {"type": "object", "properties": {"ok": {"type": "boolean"}}, "required": ["ok"]})
-        return st["model"]
+            provider.chat_json("Reply with JSON.", 'Return {"ok": true}', PROBE_SCHEMA)
+        return f"{provider.label} ({st.get('model')})"
 
     check("database", db_check)
     check("redis", lambda: str(redis.Redis.from_url(get_settings().redis_url).ping()))
-    check("local LLM", llm_check)
+    check("AI provider", ai_check)
     check("task registry", lambda: ", ".join(registry.load_all()))
 
     def workers_check():

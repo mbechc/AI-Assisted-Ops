@@ -5,9 +5,11 @@ from dataclasses import dataclass, field
 
 from app.usecases.ap_site.learners import SiteIndex
 
-SIGNALS = ("uplink", "rf", "name", "tag", "subnet", "geoip")
+SIGNALS = ("uplink", "rf", "name", "tag", "subnet", "geoip", "ai_naming")
 # Optional signals add evidence when configured but never lower coverage when absent.
-OPTIONAL_SIGNALS = {"geoip"}
+OPTIONAL_SIGNALS = {"geoip", "ai_naming"}
+# A proposal supported only by these is capped and never executed automatically.
+CAPPED_SIGNALS = {"geoip", "ai_naming"}
 GEOIP_ONLY_MAX_CONFIDENCE = 60
 SIGNAL_LABELS = {
     "uplink": "Wired uplink (CDP/LLDP)",
@@ -16,7 +18,9 @@ SIGNAL_LABELS = {
     "tag": "AP site tag / location",
     "subnet": "Management subnet",
     "geoip": "GeoIP (subnet location)",
+    "ai_naming": "Naming convention (AI-learned)",
 }
+UNAVAILABLE_TEXT = {"geoip": "not configured", "ai_naming": "AI off, or no validated naming convention"}
 
 
 @dataclass
@@ -143,10 +147,11 @@ def score(votes: dict[str, SignalVote], available: dict[str, bool], weights: dic
 
     confidence = int(round(100 * conf_b * floor_factor))
     auto_eligible = True
-    if agreeing == ["geoip"]:
+    if agreeing and set(agreeing) <= CAPPED_SIGNALS:
         confidence = min(confidence, GEOIP_ONLY_MAX_CONFIDENCE)
         auto_eligible = False
-        concerns.append(f"Only GeoIP supports this site: confidence capped at {GEOIP_ONLY_MAX_CONFIDENCE} "
+        only = " and ".join(SIGNAL_LABELS[s] for s in agreeing)
+        concerns.append(f"Only {only} supports this site: confidence capped at {GEOIP_ONLY_MAX_CONFIDENCE} "
                         "and never executed automatically.")
     return Score(b1, site_id, floor_determined, max(0, min(100, confidence)), dict(building_scores),
                  dict(floor_scores), candidates[:8], evidence, concerns, auto_eligible, margin, coverage)
@@ -164,7 +169,7 @@ def _evidence(votes: dict[str, SignalVote], available: dict[str, bool], w_norm: 
             "label": SIGNAL_LABELS[s],
             "available": bool(available.get(s)),
             "weight": round(w_norm.get(s, 0.0), 3),
-            "detail": v.detail if v else (("not configured" if s in OPTIONAL_SIGNALS else "not available")
+            "detail": v.detail if v else (UNAVAILABLE_TEXT.get(s, "not available")
                                           if not available.get(s) else "no data for this device"),
             "buildings": [{"site_id": b, "site": index.short(b), "strength": round(st, 3)} for b, st in top],
             "floors": [{"site_id": f, "site": index.short(f), "strength": round(st, 3)} for f, st in floors],

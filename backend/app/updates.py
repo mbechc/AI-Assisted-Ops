@@ -91,10 +91,15 @@ def pending() -> list[dict]:
     return out
 
 
+LLM_ACTIONS = ("llm-enable", "llm-disable", "llm-remove")
+
+
 def queue(action: str, arg: str | None = None) -> None:
     """Drop a request for the host updater. The file name is the whole request; contents are ignored."""
-    if action not in ("check", "connectivity", "channel", "install"):
+    if action not in ("check", "connectivity", "channel", "install") + LLM_ACTIONS:
         raise ValueError(action)
+    if action in LLM_ACTIONS and arg:
+        raise ValueError(arg)
     if action == "channel" and arg not in CHANNELS:
         raise ValueError(arg)
     if action == "install" and not (arg and VERSION_RE.match(arg)):
@@ -104,6 +109,35 @@ def queue(action: str, arg: str | None = None) -> None:
     name = f"{time.time_ns()}-{action}" + (f"-{arg}" if arg else "")
     fd = os.open(d / name, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o644)
     os.close(fd)
+
+
+def llm_state() -> dict:
+    """Local LLM container/model state as reported by the host updater (data/update/llm.json).
+
+    state: absent (never enabled) | queued | installing | pulling | ready | failed | disabled | removed
+    """
+    raw = _read("llm.json") or {}
+    queued = [p for p in pending() if p["action"] in LLM_ACTIONS]
+    state = raw.get("state") or "absent"
+    if queued:
+        state = "queued"
+    return {
+        "state": state,
+        "model": raw.get("model") or get_settings().ollama_model,
+        "updated_at": raw.get("updated_at"),
+        "error": raw.get("error"),
+        "pending": [p["action"] for p in queued],
+        "updater_stale": any(p["age_seconds"] > UPDATER_STALE_SECONDS for p in queued),
+    }
+
+
+def llm_log_tail(lines: int = 200) -> str:
+    try:
+        text = (update_dir() / "llm.log").read_text(errors="replace")
+    except OSError:
+        return ""
+    text = re.sub(r"\x1b\[[0-9;]*m", "", text)
+    return "\n".join(text.splitlines()[-lines:])
 
 
 def connectivity(now: datetime | None = None) -> dict:

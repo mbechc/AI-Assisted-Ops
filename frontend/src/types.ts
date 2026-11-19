@@ -51,6 +51,8 @@ export interface Task {
   source_kind: string;
   worker: string;
   optional_sources: string[];
+  ai_features: Record<string, string>;
+  ai_mode: AiMode;
   action_types: Record<string, string>;
   max_autonomy: number;
   level_names: Record<string, string>;
@@ -101,6 +103,7 @@ export interface WorkItem {
   rule_confidence: number;
   llm_confidence: number | null;
   llm_status: string;
+  llm_provider: "local" | "cloud" | null;
   status: string;
   blocked_reason: string | null;
   rationale: string;
@@ -232,6 +235,35 @@ export interface Release {
   published_at: string | null;
   notes: string;
   url: string | null;
+}
+
+export type AiMode = "none" | "local" | "cloud";
+
+export interface AiCloudConfig {
+  endpoint: string;
+  deployment: string;
+  api_version: string;
+  auth: "api_key" | "entra";
+  tenant_id: string;
+  client_id: string;
+  api_key_set: boolean;
+  client_secret_set: boolean;
+}
+
+export interface AiState {
+  mode: AiMode;
+  effective_mode: AiMode;
+  labels: Record<AiMode, string>;
+  local: {
+    state: "absent" | "queued" | "installing" | "pulling" | "ready" | "failed" | "disabled" | "removed";
+    model: string;
+    updated_at: string | null;
+    error: string | null;
+    pending: string[];
+    updater_stale: boolean;
+  };
+  cloud: AiCloudConfig;
+  can_manage: boolean;
 }
 
 export interface UpdateState {

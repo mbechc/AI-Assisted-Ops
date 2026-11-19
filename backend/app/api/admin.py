@@ -12,7 +12,7 @@ from app.config import get_settings
 from app.connectors.base import CONNECTOR_KINDS
 from app.deps import current_user, get_db, require
 from app.framework.runner import revoke_open_auto_items
-from app.llm.ollama import OllamaClient
+from app.llm.factory import effective_mode, get_provider
 from app.models import AuditLog, User
 from app.security import ROLES, hash_password
 from app.store import all_settings, get_setting, set_setting
@@ -134,9 +134,11 @@ def system_status(db: Session = Depends(get_db), _=Depends(current_user)):
         workers = celery.control.inspect(timeout=1.5).ping() or {}
     except Exception:  # noqa: BLE001
         pass
+    provider = get_provider(db)
     return {
         "version": s.aiops_version,
-        "llm": OllamaClient().status(),
+        "ai_mode": effective_mode(db),
+        "llm": provider.status() if provider else {"provider": None, "ready": False},
         "scheduler_alive": bool(hb and time.time() - float(hb) < 180),
         "workers": sorted(workers.keys()),
         "queue_depth": {f"run.{w}": r.llen(f"run.{w}") for w in WORKERS},

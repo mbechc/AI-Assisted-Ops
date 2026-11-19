@@ -40,6 +40,44 @@ env_set() {
   fi
 }
 
+env_unset() {
+  sed -i "/^$1=/d" "$INSTALL_DIR/.env"
+}
+
+# COMPOSE_PROFILES in .env is a comma list (mock, llm); compose reads it for every command.
+profile_has() { case ",$(env_get COMPOSE_PROFILES)," in *",$1,"*) return 0 ;; *) return 1 ;; esac; }
+profile_add() {
+  profile_has "$1" && return 0
+  local cur; cur="$(env_get COMPOSE_PROFILES)"
+  env_set COMPOSE_PROFILES "${cur:+$cur,}$1"
+}
+profile_remove() {
+  local out
+  out="$(env_get COMPOSE_PROFILES | tr ',' '\n' | { grep -vx -e "$1" -e '' || true; } | paste -sd, -)"
+  if [ -n "$out" ]; then env_set COMPOSE_PROFILES "$out"; else env_unset COMPOSE_PROFILES; fi
+}
+
+# Pulls OLLAMA_MODEL into the running ollama container unless present. Offline: imports
+# data/llm/ollama-models.tgz when it exists.
+llm_pull_model() {
+  local model; model="$(env_get OLLAMA_MODEL)"; model="${model:-qwen2.5:7b-instruct}"
+  if compose exec -T ollama ollama list 2>/dev/null | awk 'NR>1 {print $1}' | grep -qx "$model"; then
+    echo "LLM model $model already present"
+    return 0
+  fi
+  if [ -f "$INSTALL_DIR/data/llm/ollama-models.tgz" ]; then
+    echo "Importing LLM model from data/llm/ollama-models.tgz"
+    compose exec -T ollama tar xzf - -C /root/.ollama <"$INSTALL_DIR/data/llm/ollama-models.tgz"
+    compose restart ollama >/dev/null
+    wait_healthy ollama 180 || return 1
+    compose exec -T ollama ollama list 2>/dev/null | awk 'NR>1 {print $1}' | grep -qx "$model" && return 0
+    echo "model $model is not in the imported archive"
+    return 1
+  fi
+  echo "Pulling LLM model $model (several GB, one time)"
+  compose exec -T ollama ollama pull "$model"
+}
+
 rand_hex() { head -c "${1:-32}" /dev/urandom | od -An -tx1 | tr -d ' \n'; }
 fernet_key() { head -c 32 /dev/urandom | base64 | tr '+/' '-_' | tr -d '\n'; }
 

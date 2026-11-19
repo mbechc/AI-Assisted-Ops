@@ -6,25 +6,17 @@ from typing import Any
 import httpx
 
 from app.config import get_settings
+from app.llm.base import REVIEW_SCHEMA, LLMUnavailable, normalize_review
 
 log = logging.getLogger(__name__)
 
-REVIEW_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "confidence": {"type": "integer", "minimum": 0, "maximum": 100},
-        "rationale": {"type": "string"},
-        "concerns": {"type": "array", "items": {"type": "string"}},
-    },
-    "required": ["confidence", "rationale", "concerns"],
-}
-
-
-class LLMUnavailable(Exception):
-    pass
+__all__ = ["OllamaClient", "LLMUnavailable", "REVIEW_SCHEMA"]
 
 
 class OllamaClient:
+    name = "local"
+    label = "Local AI"
+
     def __init__(self, url: str | None = None, model: str | None = None, timeout: float | None = None):
         s = get_settings()
         self.url = (url or s.ollama_url).rstrip("/")
@@ -37,9 +29,12 @@ class OllamaClient:
             r.raise_for_status()
             names = [m.get("name") for m in r.json().get("models", [])]
             wanted = self.model if ":" in self.model else f"{self.model}:latest"
-            return {"reachable": True, "model": self.model, "model_present": wanted in names, "models": names}
+            present = wanted in names
+            return {"provider": self.name, "reachable": True, "model": self.model, "model_present": present,
+                    "ready": present, "models": names}
         except Exception as exc:  # noqa: BLE001
-            return {"reachable": False, "model": self.model, "model_present": False, "error": str(exc)}
+            return {"provider": self.name, "reachable": False, "model": self.model, "model_present": False,
+                    "ready": False, "error": str(exc)}
 
     def chat_json(self, system: str, user: str, schema: dict, num_ctx: int = 4096) -> dict[str, Any]:
         payload = {
@@ -60,10 +55,4 @@ class OllamaClient:
         return json.loads(content)
 
     def review(self, system: str, user: str) -> dict[str, Any]:
-        out = self.chat_json(system, user, REVIEW_SCHEMA)
-        conf = int(max(0, min(100, int(out.get("confidence", 0)))))
-        return {
-            "confidence": conf,
-            "rationale": str(out.get("rationale", "")).strip()[:2000],
-            "concerns": [str(c)[:300] for c in (out.get("concerns") or [])][:8],
-        }
+        return normalize_review(self.chat_json(system, user, REVIEW_SCHEMA))

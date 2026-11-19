@@ -63,6 +63,19 @@ export function Level({ level }: { level: number }) {
   return <span className={`badge ${cls}`}>L{level}</span>;
 }
 
+const AI_LABEL = { none: "AI Capable", local: "Local AI Assisted", cloud: "Cloud AI Assisted" } as const;
+
+export function AiLabel({ features, mode, style }: {
+  features: Record<string, string>; mode: keyof typeof AI_LABEL; style?: React.CSSProperties;
+}) {
+  const list = Object.values(features || {});
+  if (!list.length) return null;
+  const title = (mode === "none"
+    ? "Runs fully on rules. With AI enabled (Settings > AI assistance) it adds:\n"
+    : `AI (${mode === "local" ? "local LLM" : "Azure OpenAI"}) adds:\n`) + list.map((f) => `- ${f}`).join("\n");
+  return <span className={`badge ${mode === "none" ? "ai" : "ai-on"}`} style={style} title={title}>{AI_LABEL[mode]}</span>;
+}
+
 export function Drawer({ onClose, children }: { onClose: () => void; children: ReactNode }) {
   useEffect(() => {
     const h = (e: KeyboardEvent) => e.key === "Escape" && onClose();

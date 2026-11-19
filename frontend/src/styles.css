@@ -143,6 +143,9 @@ label.check { display: flex; gap: 6px; align-items: center; }
 .badge.warn { background: rgba(210, 153, 34, .15); color: var(--warn); }
 .badge.info { background: rgba(88, 166, 255, .15); color: var(--info); }
 .badge.muted { background: var(--panel-2); color: var(--muted); }
+/* Expert Task AI labels: blue = AI Capable (runs on rules, AI off), green = AI Assisted (local or cloud) */
+.badge.ai { background: rgba(88, 166, 255, .15); color: var(--info); border-color: rgba(88, 166, 255, .35); }
+.badge.ai-on { background: rgba(63, 185, 80, .15); color: var(--ok); border-color: rgba(63, 185, 80, .35); }
 
 .conf { display: inline-flex; align-items: center; gap: 6px; min-width: 90px; }
 .conf .bar { width: 48px; height: 6px; background: var(--panel-2); border-radius: 3px; overflow: hidden; }

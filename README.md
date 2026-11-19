@@ -1,7 +1,8 @@
 # AIOps: AI-Assisted Operations for Cisco Catalyst Center
 
-**Your network's night shift: a local AI that clears the repetitive Catalyst Center backlog, shows its
-evidence, and only acts as autonomously as you allow.**
+**Your network's night shift: an expert system that clears the repetitive Catalyst Center backlog, shows
+its evidence, and only acts as autonomously as you allow. AI is optional, local or in your own Azure
+tenant.**
 
 ## Why it's valuable
 
@@ -14,7 +15,8 @@ assurance, maps and reports. AIOps works through that backlog continuously.
   (CDP/LLDP neighbours, RF neighbours, naming, subnets, inventory history, optional GeoIP).
 - **You set the autonomy.** L0 report only, L1 every change reviewed, L2 automatic above a confidence
   threshold, L3 full autonomy. Per-task caps, a global cap and a kill switch.
-- **Private by design.** The LLM runs locally (Ollama, CPU only). No network data leaves the host.
+- **Private by design.** AI is off by default and no network data leaves the host. If you turn it on,
+  choose a local LLM (Ollama, CPU only, nothing leaves the host) or Azure OpenAI in your own tenant.
 - **Safe change path.** Every change goes through the Catalyst Center API. Nothing connects to WLCs, APs
   or switches directly (no SSH, NETCONF or Command Runner).
 - **Accountable.** Every approval, change, setting and log view is in the audit log; a review queue
@@ -37,6 +39,35 @@ assurance, maps and reports. AIOps works through that backlog continuously.
 (default weight 0.15); a proposal backed only by GeoIP is capped at confidence 60 and never executed
 automatically.
 
+## How AI is used
+
+Every task is an **Expert Task**: rules and evidence from Catalyst Center make the proposals, and every
+task works fully without AI. AI is an optional assistant on top. Choose one of three modes under
+**Settings → AI assistance**:
+
+| Mode | What runs | Data leaves the host | Default |
+|---|---|---|---|
+| **No AI** | Rules and evidence only | No | Yes |
+| **Local LLM** | Ollama on the appliance (CPU), installed only when you select it | No | |
+| **Azure OpenAI** | Your Azure OpenAI deployment (Microsoft's enterprise LLM service, the models behind Copilot) | Yes, to your Azure tenant | |
+
+Where AI adds value, and what happens without it:
+
+| Use | Task | With AI | Without AI |
+|---|---|---|---|
+| Second opinion on proposals | AP site assignment, Wrong-site detection | Reviews the evidence; can lower confidence a lot, raise it by at most 5 | Confidence from the evidence alone |
+| Naming conventions | AP site assignment, Wrong-site detection, AP hostname reset | Learns irregular naming schemes (city codes, aliases, odd templates); used only after it rebuilds at least 95% of known names | Prefix and number rules |
+| Rename detection | Site hierarchy drift | Confirms ambiguous delete-and-recreate renames | Clear renames found by name normalising and similarity |
+| Reviewer feedback | Every task (Calibration and feedback tab) | Summarises reviewer notes into themes and suggested parameter changes (advice only) | Rejection and override rates per group and evidence signal |
+| Shift summary | Dashboard | Short handover narrative | The same facts as a list |
+| Owner reports | Telemetry baseline | Ticket-ready wording per failure cause | Template ticket text |
+
+The task list labels each task: blue **AI Capable** when the task can use AI but AI is off, green
+**Local AI Assisted** or **Cloud AI Assisted** when it is on. Tasks without an AI feature have no label.
+AI never executes anything itself: it only adjusts confidence or wording, every AI answer is validated,
+and the rules decide. See [docs/AI_USAGE.md](docs/AI_USAGE.md) for what is sent, the safety model and an
+FAQ.
+
 ## Getting started
 
 ### Operating system
@@ -51,18 +82,18 @@ The installer installs Docker Engine and the compose plugin from Docker's reposi
 
 ### Machine
 
-| | Requirement |
-|---|---|
-| CPU | 16 vCPU, x86_64 with AVX2 |
-| Memory | 64 GB RAM |
-| Disk | 200 GB SSD under the Docker root (`/var/lib/docker`) |
+| | No AI or Azure OpenAI | Local LLM |
+|---|---|---|
+| CPU | 8 vCPU, x86_64 | 16 vCPU, x86_64 with AVX2 |
+| Memory | 16 GB RAM | 64 GB RAM |
+| Disk | 100 GB SSD under the Docker root (`/var/lib/docker`) | 200 GB SSD |
 
-The LLM runs on the CPU, so more cores means faster reviews. The size leaves room for a larger model,
-more use cases and more Catalyst Centers, two models side by side during a model change, image versions
-kept for rollback, database growth and 14 days of backups.
+The local LLM runs on the CPU, so more cores means faster reviews; size the VM for Local LLM if you may
+turn it on later. The sizes leave room for more use cases and Catalyst Centers, image versions kept for
+rollback, database growth and 14 days of backups.
 
-Network: HTTPS from the host to your Catalyst Center(s), and to GitHub for installation and updates
-(see [Updates](#updates)).
+Network: HTTPS from the host to your Catalyst Center(s), to GitHub for installation and updates
+(see [Updates](#updates)) and, with Azure OpenAI, to your Azure OpenAI endpoint.
 
 ### Install
 
@@ -81,8 +112,8 @@ curl -fsSL https://raw.githubusercontent.com/mbechc/AI-Assisted-Ops/master/get-a
 ```
 
 It finds the newest Production release on GitHub, verifies its checksum, installs into `/opt/AIOps`,
-pulls the prebuilt images from ghcr.io and the local LLM model, initialises the database, creates the
-`admin` user and runs a self-test. At the end it prints the portal URL and the admin password (also stored
+pulls the prebuilt images from ghcr.io, initialises the database, creates the `admin` user and runs a
+self-test. No LLM is downloaded: the appliance starts in No AI mode. At the end it prints the portal URL and the admin password (also stored
 in `/opt/AIOps/initial-admin-password.txt`; delete it after the first login).
 
 Options go after `bash -s --`:
@@ -110,7 +141,7 @@ configure the Docker daemon proxy as well, so image pulls work.
 1. Log in at `https://<host>/` as `admin` and change the password (user menu, bottom left).
 2. **Data sources**: add the Catalyst Center (URL, a user with network-admin or an assign-device role),
    then **Test**, which detects the release and shows which API variant each operation uses.
-3. **Recurring tasks**: press **Run** on a task (or open it to set its source and schedule), then review
+3. **Expert Tasks**: press **Run** on a task (or open it to set its source and schedule), then review
    the proposals in **Review queue**. Schedules are cron expressions in UTC with presets on the task page.
 4. As calibration builds up (approved vs. rejected per confidence band), raise the autonomy level. Every
    task has a cap; the global cap and the kill switch are under **Settings**. The global cap starts at
@@ -124,6 +155,25 @@ configure the Docker daemon proxy as well, so image pulls work.
    deleted one does not come back on upgrade.
 7. Optional: replace `/opt/AIOps/certs/server.crt` and `server.key` with your own certificate and run
    `docker compose restart web` in `/opt/AIOps`.
+8. **AI assistance (optional)**: see [Enabling AI](#enabling-ai).
+
+### Enabling AI
+
+Admins choose the mode under **Settings → AI assistance**. Switching is possible at any time; the next
+task run uses the new mode.
+
+- **Local LLM**: confirm, and the host updater starts the Ollama container and downloads the model
+  (about 5 GB, from `registry.ollama.ai`). The section shows the progress and log; until the model is
+  ready the tasks keep running without AI. **Remove model** stops the container and deletes the model;
+  switching to another mode stops it and optionally deletes it. From the shell:
+  `sudo /opt/AIOps/scripts/update.sh --llm enable|disable|remove`. Air-gapped: put an
+  `ollama-models.tgz` (from `scripts/export-bundle.sh` on a host that has the model) in
+  `/opt/AIOps/data/llm/` before enabling.
+- **Azure OpenAI**: create an Azure OpenAI resource and a chat model deployment (for example
+  `gpt-4o-mini`) in your tenant. Enter the endpoint (`https://<resource>.openai.azure.com`), the
+  deployment name and an API key, or a Microsoft Entra app registration (tenant ID, client ID, secret)
+  with the *Cognitive Services OpenAI User* role. **Test connection** sends a tiny prompt; secrets are
+  stored encrypted and never shown again.
 
 ## Updates
 
@@ -151,8 +201,10 @@ Updates are online only. The host must reach:
 | `github.com` | Release download |
 | `objects.githubusercontent.com`, `release-assets.githubusercontent.com` | Release download (redirect target) |
 | `ghcr.io`, `pkg-containers.githubusercontent.com` | Application images |
-| `registry-1.docker.io`, `auth.docker.io`, `production.cloudflare.docker.com` | Base images (PostgreSQL, Redis, Ollama), when a release changes them |
-| `registry.ollama.ai` | LLM model, when a release changes it |
+| `registry-1.docker.io`, `auth.docker.io`, `production.cloudflare.docker.com` | Base images (PostgreSQL, Redis; Ollama only with Local LLM), when a release changes them |
+| `registry.ollama.ai` | LLM model: Local LLM only, when enabled or when a release changes the model |
+| `<resource>.openai.azure.com` | Azure OpenAI mode only (not part of the update check) |
+| `login.microsoftonline.com` | Azure OpenAI with Microsoft Entra sign-in only |
 
 **Refresh** tests the GitHub endpoints from the Linux host itself (its DNS, proxy and firewall) and shows
 each one as reachable or not, with the response time or the error. The same test runs every 15 minutes
@@ -184,7 +236,7 @@ All scripts are in `/opt/AIOps`:
 
 | Command | Purpose |
 |---|---|
-| `scripts/healthcheck.sh` | Container health, portal, API, database, Redis, LLM self-test |
+| `scripts/healthcheck.sh` | Container health, portal, API, database, Redis, AI provider check |
 | `scripts/backup.sh` | Database dump + `.env`/certificates into `backups/` (keeps 14) |
 | `scripts/restore.sh backups/db-....sql.gz` | Restore a database dump |
 | `scripts/update.sh` | Host updater (see [Updates](#updates)) |

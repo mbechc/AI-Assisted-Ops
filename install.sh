@@ -25,7 +25,6 @@ BUILD_LOCAL=0
 CHANNEL=""
 OFFLINE_BUNDLE=""
 SKIP_DOCKER_INSTALL=0
-SKIP_MODEL=0
 ASSUME_YES=0
 
 usage() {
@@ -36,14 +35,14 @@ Usage: sudo ./install.sh [options]
   --channel TRACK         Update track: production (default) or development
   --hostname NAME         Hostname for the TLS certificate (default: this host's FQDN)
   --admin-password PW     Initial admin password (default: generated and shown once)
-  --model TAG             Ollama model (default qwen2.5:7b-instruct)
+  --model TAG             Ollama model used once Local LLM is enabled in Settings (default qwen2.5:7b-instruct)
   --https-port N          HTTPS port (default 443)
   --http-port N           HTTP port, redirects to HTTPS (default 80)
   --with-mock             Also run simulated Catalyst Center 2.3/3.1 for testing
   --build                 Build the images locally instead of pulling them from ghcr.io (development)
   --offline-bundle FILE   Install from an offline bundle (no Internet needed; Docker must be installed)
   --skip-docker-install   Never install Docker (fail if missing)
-  --skip-model            Do not pull the LLM model (system runs with rule-based confidence only)
+  --skip-model            Deprecated, no effect: the LLM is never installed by the installer
   -y, --yes               Non-interactive
 EOF
 }
@@ -63,7 +62,7 @@ while [ $# -gt 0 ]; do
       shift 2 ;;
     --offline-bundle) OFFLINE_BUNDLE="$(cd "$(dirname "$2")" && pwd)/$(basename "$2")"; shift 2 ;;
     --skip-docker-install) SKIP_DOCKER_INSTALL=1; shift ;;
-    --skip-model) SKIP_MODEL=1; shift ;;
+    --skip-model) c_warn "--skip-model is deprecated: the local LLM is only installed from Settings > AI assistance"; shift ;;
     -y|--yes) ASSUME_YES=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) usage; die "unknown option $1" ;;
@@ -152,11 +151,17 @@ preflight() {
   [ "$cores" -ge 4 ] || die "at least 4 CPU cores required (found $cores)"
   [ "$mem_gb" -ge 15 ] || die "at least 16 GB RAM required (found ${mem_gb} GB)"
   [ "$disk_gb" -ge 20 ] || die "at least 20 GB free disk in $root required (found ${disk_gb} GB)"
-  [ "$cores" -ge 16 ] && c_ok "CPU cores: $cores" || c_warn "CPU cores: $cores (requirement: 16 vCPU, see README.md)"
+  # Supported sizes: No AI / Azure OpenAI 8 vCPU, 16 GB, 100 GB; Local LLM 16 vCPU, 64 GB, 200 GB.
   # MemTotal is reported slightly below the installed size.
-  [ "$mem_gb" -ge 60 ] && c_ok "Memory: ${mem_gb} GB" || c_warn "Memory: ${mem_gb} GB (requirement: 64 GB, see README.md)"
-  [ "$disk_gb" -ge 200 ] && c_ok "Free disk in $root: ${disk_gb} GB" \
-    || c_warn "Free disk in $root: ${disk_gb} GB (requirement: 200 GB, see README.md)"
+  if [ "$cores" -ge 16 ] && [ "$mem_gb" -ge 60 ] && [ "$disk_gb" -ge 200 ]; then
+    c_ok "Size: $cores vCPU, ${mem_gb} GB RAM, ${disk_gb} GB free in $root (all AI modes)"
+  elif [ "$cores" -ge 8 ] && [ "$disk_gb" -ge 100 ]; then
+    c_ok "Size: $cores vCPU, ${mem_gb} GB RAM, ${disk_gb} GB free in $root (No AI and Azure OpenAI)"
+    c_warn "Local LLM needs 16 vCPU, 64 GB RAM and 200 GB disk (see README.md)"
+  else
+    c_warn "Size: $cores vCPU, ${mem_gb} GB RAM, ${disk_gb} GB free in $root" \
+      "(requirement: 8 vCPU, 16 GB RAM, 100 GB disk; see README.md)"
+  fi
 
   local running_web=""
   [ -f "$INSTALL_DIR/docker-compose.yml" ] && [ -f "$INSTALL_DIR/.env" ] && running_web="$(compose ps -q web 2>/dev/null || true)"
@@ -179,7 +184,7 @@ stage_files() {
       | (cd "$INSTALL_DIR" && tar --no-same-owner -xf -)
   fi
   mkdir -p "$INSTALL_DIR/certs" "$INSTALL_DIR/data/fixtures" "$INSTALL_DIR/data/geoip" "$INSTALL_DIR/data/update/requests" \
-    "$INSTALL_DIR/backups"
+    "$INSTALL_DIR/data/llm" "$INSTALL_DIR/backups"
   find "$INSTALL_DIR" -path "$INSTALL_DIR/data" -prune -o ! -user root -exec chown root:root {} +
   chmod go-w "$INSTALL_DIR"
   chown -R 10001:10001 "$INSTALL_DIR/data"
@@ -212,7 +217,7 @@ configure_env() {
   [ -n "$MODEL" ] && env_set OLLAMA_MODEL "$MODEL"
   [ -n "$HTTPS_PORT_ARG" ] && env_set HTTPS_PORT "$HTTPS_PORT_ARG"
   [ -n "$HTTP_PORT_ARG" ] && env_set HTTP_PORT "$HTTP_PORT_ARG"
-  [ "$WITH_MOCK" = 1 ] && env_set COMPOSE_PROFILES mock
+  [ "$WITH_MOCK" = 1 ] && profile_add mock
   HTTPS_PORT="$(env_get HTTPS_PORT)"
   HTTP_PORT="$(env_get HTTP_PORT)"
   MODEL="$(env_get OLLAMA_MODEL)"
@@ -278,11 +283,10 @@ load_offline_bundle() {
   c_info "Loading offline bundle $OFFLINE_BUNDLE"
   tar -xf "$OFFLINE_BUNDLE" -C "$tmp"
   docker load -i "$tmp/images.tar"
-  if [ -f "$tmp/ollama-models.tgz" ]; then
-    docker volume create "$(project_name)_ollama" >/dev/null
-    docker run --rm -v "$(project_name)_ollama":/root/.ollama -v "$tmp":/in --entrypoint tar ollama/ollama:0.40.16 \
-      xzf /in/ollama-models.tgz -C /root/.ollama
-    c_ok "LLM model restored from bundle"
+  # Older bundles carry the model; keep it for a later Settings > AI assistance > Local LLM (never loaded now).
+  if [ -f "$tmp/ollama-models.tgz" ] && [ ! -f "$INSTALL_DIR/data/llm/ollama-models.tgz" ]; then
+    cp "$tmp/ollama-models.tgz" "$INSTALL_DIR/data/llm/ollama-models.tgz"
+    c_ok "LLM model archive kept in data/llm/ (used only if Local LLM is enabled)"
   fi
   rm -rf "$tmp"
 }
@@ -290,7 +294,7 @@ load_offline_bundle() {
 build_images() {
   c_info "Pulling base images and building AIOps $VERSION locally"
   # Pull every image that is not built locally (compose < 2.22 lacks --ignore-buildable).
-  compose pull --ignore-buildable 2>/dev/null || compose pull postgres redis ollama logproxy
+  compose pull --ignore-buildable 2>/dev/null || compose pull postgres redis logproxy
   compose build --pull
 }
 
@@ -300,15 +304,34 @@ pull_images() {
   compose pull --quiet || die "image pull failed: check Internet/proxy access to ghcr.io (or use --build)"
 }
 
-pull_model() {
-  if [ "$SKIP_MODEL" = 1 ]; then c_warn "Skipping model pull"; return; fi
-  if compose exec -T ollama ollama list 2>/dev/null | awk 'NR>1 {print $1}' | grep -qx "$MODEL"; then
-    c_ok "LLM model $MODEL already present"
-    return
+# Releases before the AI modes always ran ollama. Unless Local LLM was enabled since, stop and remove
+# that container to free its memory; the model volume stays, so enabling Local LLM later is quick.
+stop_legacy_llm() {
+  profile_has llm && return 0
+  local ids
+  ids="$(docker ps -aq --filter "label=com.docker.compose.project=$(project_name)" \
+    --filter "label=com.docker.compose.service=ollama")"
+  [ -n "$ids" ] || return 0
+  c_info "Stopping the local LLM container (AI is now off by default; enable it in Settings > AI assistance)"
+  # shellcheck disable=SC2086
+  docker rm -f $ids >/dev/null
+}
+
+# Only on upgrades of an appliance where an admin enabled Local LLM (COMPOSE_PROFILES contains llm):
+# keeps a changed OLLAMA_MODEL working. Fresh installs never start Ollama or download a model.
+refresh_local_llm() {
+  profile_has llm || return 0
+  c_info "Local LLM is enabled: checking model $MODEL"
+  if ! wait_healthy ollama 180; then
+    c_warn "ollama did not become healthy; AI review falls back to rules until it does"
+    return 0
   fi
-  [ -n "$OFFLINE_BUNDLE" ] && { c_warn "Model $MODEL not in bundle; LLM review disabled until it is added"; return; }
-  c_info "Pulling LLM model $MODEL (several GB, one time)"
-  compose exec -T ollama ollama pull "$MODEL"
+  if [ -n "$OFFLINE_BUNDLE" ] && [ ! -f "$INSTALL_DIR/data/llm/ollama-models.tgz" ]; then
+    compose exec -T ollama ollama list 2>/dev/null | awk 'NR>1 {print $1}' | grep -qx "$MODEL" \
+      || c_warn "Model $MODEL is not present and this is an offline install; add data/llm/ollama-models.tgz"
+    return 0
+  fi
+  llm_pull_model || c_warn "model $MODEL could not be pulled; AI review falls back to rules"
 }
 
 # ------------------------------------------------------------------ main
@@ -346,12 +369,10 @@ main() {
   compose run --rm -T --no-deps --user 0 -v "$INSTALL_DIR/certs:/certs:z" api manage gen-cert \
     --hostname "$(env_get AIOPS_HOSTNAME)" $ips --out /certs
 
-  c_info "Starting database, queue and local LLM"
-  compose up -d postgres redis ollama
+  c_info "Starting database and queue"
+  compose up -d postgres redis
   wait_healthy postgres 180 || die "postgres did not become healthy"
   wait_healthy redis 120 || die "redis did not become healthy"
-  wait_healthy ollama 180 || die "ollama did not become healthy"
-  pull_model
 
   c_info "Database migrations"
   compose run --rm -T api migrate
@@ -367,20 +388,18 @@ main() {
   fi
 
   c_info "Starting all services"
+  stop_legacy_llm
   compose up -d --remove-orphans
   for svc in $(services); do
     wait_healthy "$svc" 300 || { compose logs --tail 50 "$svc"; die "$svc did not become healthy"; }
   done
-  if [ "$(env_get COMPOSE_PROFILES)" = "mock" ]; then
+  if profile_has mock; then
     compose run --rm -T api manage add-mock-sources
   fi
+  refresh_local_llm
 
-  local hc_args=""
-  if ! compose exec -T ollama ollama list 2>/dev/null | awk 'NR>1 {print $1}' | grep -qx "$MODEL"; then
-    hc_args="--allow-no-model"
-  fi
-  # shellcheck disable=SC2086
-  "$INSTALL_DIR/scripts/healthcheck.sh" $hc_args || die "post-install self-test failed"
+  # The self-test only checks the AI provider selected in Settings (none on a fresh install).
+  "$INSTALL_DIR/scripts/healthcheck.sh" --allow-no-model || die "post-install self-test failed"
 
   echo
   c_ok "AIOps $VERSION is installed and running."

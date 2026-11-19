@@ -15,8 +15,11 @@ from app.framework import registry
 from app.framework.autonomy import effective_autonomy
 from app.framework.base import LEVEL_NAMES
 from app.framework.calibration import calibration
+from app.framework.insights import ai_summary, cached_ai_summary, insights
 from app.framework.runner import RunAlreadyActive, create_run, decide, ensure_task_configs
 from app.item_filter import ItemFilter, apply, item_filter
+from app.llm.base import LLMUnavailable
+from app.llm.factory import effective_mode, get_provider
 from app.models import DataSource, TaskConfig, TaskRun, User, WorkItem
 
 router = APIRouter(tags=["tasks"])
@@ -55,7 +58,7 @@ def item_out(i: WorkItem, full: bool = False) -> dict:
     d = {"id": i.id, "task_key": i.task_key, "target_key": i.target_key, "target_label": i.target_label,
          "group_label": i.group_label, "action_type": i.action_type, "confidence": i.confidence,
          "rule_confidence": i.rule_confidence, "llm_confidence": i.llm_confidence, "llm_status": i.llm_status,
-         "status": i.status, "blocked_reason": i.blocked_reason, "rationale": i.rationale,
+         "llm_provider": i.llm_provider, "status": i.status, "blocked_reason": i.blocked_reason, "rationale": i.rationale,
          "concerns": i.concerns, "decided_by": i.decided_by, "decided_at": i.decided_at,
          "verify_status": i.verify_status, "updated_at": i.updated_at, "created_at": i.created_at,
          "source_id": i.source_id, "proposed": _proposed_summary(i)}
@@ -86,7 +89,7 @@ def _proposed_summary(i: WorkItem) -> str:
     return p.get("site_hierarchy") or p.get("summary") or ""
 
 
-def task_out(db: Session, key: str) -> dict:
+def task_out(db: Session, key: str, ai_mode: str | None = None) -> dict:
     defn = registry.get(key)
     cfg = db.get(TaskConfig, key)
     counts = dict(db.execute(select(WorkItem.status, func.count()).where(WorkItem.task_key == key)
@@ -100,6 +103,7 @@ def task_out(db: Session, key: str) -> dict:
         "key": key, "name": defn.name, "description": defn.description, "category": defn.category,
         "source_kind": defn.source_kind, "action_types": defn.action_types, "worker": defn.worker,
         "optional_sources": defn.optional_sources,
+        "ai_features": defn.ai_features, "ai_mode": ai_mode or effective_mode(db),
         "max_autonomy": defn.max_autonomy, "level_names": LEVEL_NAMES,
         "param_specs": [p.__dict__ for p in defn.params],
         "config": {"enabled": cfg.enabled, "cron": cfg.cron, "source_id": cfg.source_id,
@@ -115,7 +119,8 @@ def task_out(db: Session, key: str) -> dict:
 def list_tasks(db: Session = Depends(get_db), _=Depends(current_user)):
     ensure_task_configs(db)
     db.commit()
-    return [task_out(db, k) for k in sorted(registry.load_all())]
+    mode = effective_mode(db)
+    return [task_out(db, k, mode) for k in sorted(registry.load_all())]
 
 
 @router.get("/tasks/{key}")
@@ -218,6 +223,37 @@ def task_calibration(key: str, db: Session = Depends(get_db), _=Depends(current_
         return calibration(db, key)
     except KeyError:
         raise HTTPException(404, "unknown task")
+
+
+@router.get("/tasks/{key}/insights")
+def task_insights(key: str, db: Session = Depends(get_db), _=Depends(current_user)):
+    try:
+        base = insights(db, key)
+    except KeyError:
+        raise HTTPException(404, "unknown task")
+    provider = get_provider(db)
+    return {**base, "ai_mode": effective_mode(db), "ai": cached_ai_summary(db, key, provider)}
+
+
+@router.post("/tasks/{key}/insights/ai")
+def task_insights_ai(key: str, db: Session = Depends(get_db), user: User = Depends(require("operator"))):
+    try:
+        base = insights(db, key)
+    except KeyError:
+        raise HTTPException(404, "unknown task")
+    provider = get_provider(db)
+    if provider is None:
+        raise HTTPException(400, "AI is off. Choose Local LLM or Azure OpenAI under Settings to use AI summaries.")
+    if not base["notes"] and not base["decided"]:
+        raise HTTPException(400, "No reviewed items yet: nothing to summarise.")
+    try:
+        result = ai_summary(db, key, provider, base)
+    except (LLMUnavailable, ValueError) as exc:
+        raise HTTPException(502, f"{provider.label} unavailable: {exc}")
+    audit(db, user.username, "task.insights_ai", "task", key, provider=provider.name,
+          notes_used=result["notes_used"])
+    db.commit()
+    return {**base, "ai_mode": effective_mode(db), "ai": result}
 
 
 @router.get("/runs")

@@ -74,4 +74,5 @@ jobs:
         run: |
           cp .env.example .env
           docker compose config --quiet
-          COMPOSE_PROFILES=mock docker compose config --images
+          COMPOSE_PROFILES=mock,llm docker compose config --images
+          ! docker compose config --services | grep -qx ollama

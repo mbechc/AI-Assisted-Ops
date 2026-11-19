@@ -1,7 +1,7 @@
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
-from app.api import admin, auth, geoip, inventory, logs, review, runners, sources, tasks, updates
+from app.api import admin, ai, auth, digest, geoip, inventory, logs, review, runners, sources, tasks, updates
 from app.config import get_settings
 from app.framework import registry
 from app.logging_setup import configure_logging
@@ -37,5 +37,5 @@ def health():
 
 
 for r in (auth.router, admin.router, sources.router, geoip.router, inventory.router, runners.router, logs.router,
-          tasks.router, review.router, updates.router):
+          tasks.router, review.router, updates.router, ai.router, digest.router):
     app.include_router(r, prefix="/api")

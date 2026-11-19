@@ -62,6 +62,9 @@ class TelemetryBaseline(TaskDefinition):
     default_max_auto_per_run = 50
     action_types = {"resync_device": "Resync device inventory in Catalyst Center",
                     "report": "Owner report (no change)"}
+    ai_features = {
+        "owner_report": "Writes a grouped, ticket-ready owner report per failure cause",
+    }
     params = [
         ParamSpec("stale_hours", "No inventory update for (hours) counts as stale", "float", 48),
         ParamSpec("include_aps", "Include access points", "bool", False),

@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useAuth } from "../App";
 import { api, duration, fmtDate } from "../api";
-import { ErrorLine, Level, Status, useAsync } from "../components";
+import { AiLabel, ErrorLine, Level, Status, useAsync } from "../components";
 import { CRON_PRESETS, describeCron } from "../cron";
 import { Run, Source, Task } from "../types";
 import { RunDrawer } from "./Runs";
@@ -16,6 +16,18 @@ interface Calibration {
   recommendation: { level: number; threshold: number; samples: number; accuracy: number; blocked_by_cap: boolean; current_level: number } | null;
   target_accuracy: number;
   min_samples: number;
+}
+
+interface InsightRow { name: string; label: string; decided: number; approved: number; rejected: number; overridden: number; bad_rate: number }
+interface Insights {
+  days: number; decided: number; approved: number; rejected: number; overridden: number; bad_rate: number;
+  groups: InsightRow[]; signals: InsightRow[]; hints: string[]; ai_mode: string;
+  notes: { item_id: number; target: string; outcome: string; note: string; decided_by: string }[];
+  ai: null | {
+    provider_label: string; generated_at: string; summary: string; notes_used: number;
+    themes: { theme: string; count: number; example: string }[];
+    suggestions: { param: string; label: string; current: unknown; value: unknown; why: string }[];
+  };
 }
 
 const LEVEL_TEXT: Record<number, [string, string]> = {
@@ -50,8 +62,8 @@ export default function TaskDetail() {
     <>
       <div className="page-head">
         <div>
-          <p className="sub"><Link to="/tasks">Recurring tasks</Link> / {t.category}</p>
-          <h1>{t.name}</h1>
+          <p className="sub"><Link to="/tasks">Expert Tasks</Link> / {t.category}</p>
+          <h1>{t.name} <AiLabel features={t.ai_features} mode={t.ai_mode} style={{ verticalAlign: "middle", marginLeft: 6 }} /></h1>
           <p className="sub" style={{ maxWidth: 820 }}>{t.description}</p>
           <p className="small muted" style={{ marginTop: 6 }}>
             Runs on <Link to="/runners">worker-{t.worker}</Link>
@@ -66,6 +78,7 @@ export default function TaskDetail() {
       {msg && <div className="banner info">{msg}</div>}
       <ErrorLine error={err} />
       {t.key === "site_hierarchy_drift" && <BaselinePanel task={t} onDone={(m) => setMsg(m)} />}
+      {t.key === "telemetry_baseline" && <OwnerReports />}
       <div className="grid cols-4">
         <div className="card stat"><div className="v"><Level level={t.autonomy.level} /></div><div className="l">Effective autonomy{t.autonomy.limited_by ? ` (limited by ${t.autonomy.limited_by})` : ""}</div></div>
         <div className="card stat"><div className="v">{t.counts.proposed || 0}</div><div className="l">Awaiting review</div></div>
@@ -75,13 +88,13 @@ export default function TaskDetail() {
       <div className="tabs">
         {(["config", "runs", "calibration"] as const).map((x) => (
           <button key={x} className={tab === x ? "active" : ""} onClick={() => setTab(x)}>
-            {x === "config" ? "Configuration and autonomy" : x === "runs" ? "Runs" : "Confidence calibration"}
+            {x === "config" ? "Configuration and autonomy" : x === "runs" ? "Runs" : "Calibration and feedback"}
           </button>
         ))}
       </div>
       {tab === "config" && <Config task={t} onSaved={(nt) => { task.setData(nt); setMsg("Saved."); }} />}
       {tab === "runs" && <TaskRuns taskKey={t.key} />}
-      {tab === "calibration" && <CalibrationView task={t} />}
+      {tab === "calibration" && <><CalibrationView task={t} /><InsightsView task={t} /></>}
     </>
   );
 }
@@ -270,6 +283,144 @@ export function summarizeStats(s: Record<string, unknown>): string {
   if (!s || !Object.keys(s).length) return "";
   const pick = ["proposals", "findings", "items_created", "items_updated", "items_superseded", "items_auto_approved"];
   return pick.filter((k) => s[k] !== undefined).map((k) => `${k.replace("items_", "")}: ${s[k]}`).join(", ");
+}
+
+interface OwnerGroup {
+  class: string; label: string; count: number; title: string; body: string;
+  ai: null | { provider_label: string; title: string | null; body: string | null; rejected_reason: string | null };
+}
+
+function OwnerReports() {
+  const { can } = useAuth();
+  const rep = useAsync(() => api.get<{ ai_mode: string; groups: OwnerGroup[] }>("/digest/owner-reports"), []);
+  const [open, setOpen] = useState<string | null>(null);
+  const [busy, setBusy] = useState<string | null>(null);
+  const [err, setErr] = useState<string | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
+  const d = rep.data;
+  if (!d) return <ErrorLine error={rep.error} />;
+  if (!d.groups.length) return null;
+  const aiOn = d.ai_mode !== "none";
+  const write = async (cls: string) => {
+    setBusy(cls);
+    setErr(null);
+    try {
+      const g = await api.post<OwnerGroup>("/digest/owner-reports/ai", { cls });
+      rep.setData({ ...d, groups: d.groups.map((x) => (x.class === cls ? g : x)) });
+    } catch (e: any) {
+      setErr(e.message);
+    } finally {
+      setBusy(null);
+    }
+  };
+  const copy = (key: string, text: string) => navigator.clipboard?.writeText(text).then(() => { setCopied(key); setTimeout(() => setCopied(null), 1500); });
+  return (
+    <div className="card" style={{ marginBottom: 16 }}>
+      <h2>Owner reports {aiOn && <span className="badge ai-on" style={{ marginLeft: 6 }}>{d.ai_mode === "local" ? "Local AI" : "Cloud AI"}</span>}</h2>
+      <p className="small muted">Ticket-ready text per failure cause for the device owners. A resync cannot fix these; copy the text into your ticketing system.</p>
+      <ErrorLine error={err} />
+      {d.groups.map((g) => {
+        const useAi = !!(g.ai?.title && g.ai?.body);
+        const title = useAi ? g.ai!.title! : g.title;
+        const body = useAi ? g.ai!.body! : g.body;
+        return (
+          <div key={g.class} style={{ borderTop: "1px solid var(--border)", padding: "8px 0" }}>
+            <div className="row" style={{ justifyContent: "space-between" }}>
+              <button className="link" onClick={() => setOpen(open === g.class ? null : g.class)}><b>{g.label}</b> ({g.count} devices)</button>
+              <div className="row">
+                {aiOn && can("operator") && !useAi && <button disabled={busy === g.class} onClick={() => write(g.class)}>{busy === g.class ? "Writing..." : "Write with AI"}</button>}
+                <button onClick={() => copy(g.class, `${title}\n\n${body}`)}>{copied === g.class ? "Copied" : "Copy ticket"}</button>
+              </div>
+            </div>
+            {g.ai?.rejected_reason && <div className="banner warn">{g.ai.rejected_reason}</div>}
+            {open === g.class && (
+              <>
+                <p style={{ margin: "8px 0 4px" }}><b>{title}</b></p>
+                <pre className="small" style={{ whiteSpace: "pre-wrap" }}>{body}</pre>
+                {useAi && <p className="small muted">Written by {g.ai!.provider_label}; every device is listed (checked).</p>}
+              </>
+            )}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function InsightsView({ task }: { task: Task }) {
+  const { can } = useAuth();
+  const ins = useAsync(() => api.get<Insights>(`/tasks/${task.key}/insights`), [task.key]);
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState<string | null>(null);
+  const d = ins.data;
+  if (!d) return <ErrorLine error={ins.error} />;
+  const summarise = async () => {
+    setBusy(true);
+    setErr(null);
+    try {
+      ins.setData(await api.post<Insights>(`/tasks/${task.key}/insights/ai`));
+    } catch (e: any) {
+      setErr(e.message);
+    } finally {
+      setBusy(false);
+    }
+  };
+  const pct = (x: number) => `${(x * 100).toFixed(0)}%`;
+  const aiOn = d.ai_mode !== "none";
+  return (
+    <div className="grid cols-2" style={{ marginTop: 16 }}>
+      <div className="card">
+        <h2>Reviewer feedback (last {d.days} days)</h2>
+        {!d.decided ? <p className="muted">No reviewed items yet.</p> : (
+          <>
+            <p className="small">{d.decided} reviewed: {d.approved} approved, {d.rejected} rejected, {d.overridden} overridden ({pct(d.bad_rate)} rejected or overridden).</p>
+            {d.hints.length > 0 && <div className="banner warn">{d.hints.map((h, i) => <div key={i}>{h}</div>)}</div>}
+            {d.groups.length > 0 && (
+              <table style={{ marginTop: 8 }}>
+                <thead><tr><th>Group</th><th className="num">Reviewed</th><th className="num">Rejected</th><th className="num">Overridden</th><th className="num">Bad</th></tr></thead>
+                <tbody>{d.groups.map((g) => <tr key={g.name}><td>{g.label}</td><td className="num">{g.decided}</td><td className="num">{g.rejected}</td><td className="num">{g.overridden}</td><td className="num">{pct(g.bad_rate)}</td></tr>)}</tbody>
+              </table>
+            )}
+            {d.signals.length > 0 && (
+              <table style={{ marginTop: 8 }}>
+                <thead><tr><th>When this evidence supported the proposal</th><th className="num">Reviewed</th><th className="num">Bad</th></tr></thead>
+                <tbody>{d.signals.map((s) => <tr key={s.name}><td>{s.label}</td><td className="num">{s.decided}</td><td className="num">{pct(s.bad_rate)}</td></tr>)}</tbody>
+              </table>
+            )}
+          </>
+        )}
+      </div>
+      <div className="card">
+        <h2>What reviewers say {aiOn && <span className="badge ai-on" style={{ marginLeft: 6 }}>{d.ai_mode === "local" ? "Local AI" : "Cloud AI"}</span>}</h2>
+        {d.ai ? (
+          <>
+            <p>{d.ai.summary}</p>
+            {d.ai.themes.length > 0 && <ul className="small">{d.ai.themes.map((t, i) => <li key={i}><b>{t.theme}</b> ({t.count}){t.example && <> - <i>"{t.example}"</i></>}</li>)}</ul>}
+            {d.ai.suggestions.length > 0 && (
+              <>
+                <h3 style={{ marginTop: 10 }}>Suggested parameter changes</h3>
+                <table>
+                  <thead><tr><th>Parameter</th><th>Current</th><th>Suggested</th><th>Why</th></tr></thead>
+                  <tbody>{d.ai.suggestions.map((s) => <tr key={s.param}><td title={s.param}>{s.label}</td><td>{String(s.current)}</td><td><b>{String(s.value)}</b></td><td className="small">{s.why}</td></tr>)}</tbody>
+                </table>
+                <p className="small muted">Advice only: nothing is changed. Apply a suggestion on the Configuration tab if you agree.</p>
+              </>
+            )}
+            <p className="small muted">Generated by {d.ai.provider_label} {fmtDate(d.ai.generated_at)} from {d.ai.notes_used} notes; refreshed at most once a day.</p>
+          </>
+        ) : d.notes.length ? (
+          <>
+            <ul className="small">{d.notes.slice(0, 10).map((n) => <li key={n.item_id}><b>{n.outcome}</b> {n.target}: {n.note} <span className="muted">({n.decided_by})</span></li>)}</ul>
+            {d.notes.length > 10 && <p className="small muted">{d.notes.length - 10} more notes.</p>}
+          </>
+        ) : <p className="muted">No reviewer notes on rejected or overridden items.</p>}
+        <ErrorLine error={err} />
+        {aiOn ? (
+          can("operator") && !d.ai && d.decided > 0 && <button className="primary" disabled={busy} onClick={summarise}>{busy ? "Summarising..." : "Summarise with AI"}</button>
+        ) : <p className="small muted">With AI on (Settings, AI assistance), notes can be summarised into themes and suggested parameter changes.</p>}
+      </div>
+    </div>
+  );
 }
 
 function CalibrationView({ task }: { task: Task }) {

@@ -7,11 +7,13 @@
 #   --connectivity          reachability test only (Dashboard: Connected / AirGapped)
 #   --channel TRACK         switch the update track: production or development
 #   --version X.Y.Z         install that release: download, verify checksum, run its upgrade.sh
+#   --llm ACTION            Local LLM: enable (start ollama, pull the model), disable (stop, keep model)
+#                           or remove (stop and delete the model volume)
 #   --endpoints-override H  test only: probe host H instead of the GitHub endpoints
 #
 # The portal never runs this; it only drops request files into data/update/requests, named
-# <epoch-ns>-check, -connectivity, -channel-<track> or -install-<version>. Results go to
-# data/update/{status,install,connectivity,releases-meta}.json, releases.json and update.log.
+# <epoch-ns>-check, -connectivity, -channel-<track>, -install-<version> or -llm-<action>. Results go to
+# data/update/{status,install,connectivity,releases-meta,llm}.json, releases.json, update.log and llm.log.
 set -euo pipefail
 
 if [ "${AIOPS_UPDATER_COPY:-}" != 1 ]; then
@@ -234,6 +236,68 @@ recover_interrupted() {
     v="$(sed -E 's/.*"version": "([^"]*)".*/\1/' "$UPD/install.json")"
     install_state failed "$v" "interrupted (host restart or updater stopped); restore the pre-update backup if needed"
   fi
+  if grep -qE '"state": "(installing|pulling)"' "$UPD/llm.json" 2>/dev/null; then
+    llm_state failed "interrupted (host restart or updater stopped); enable Local LLM again to retry"
+  fi
+}
+
+# ------------------------------------------------------------------ local LLM (Settings > AI assistance)
+
+llm_state() {  # state [error]
+  local model; model="$(env_get OLLAMA_MODEL)"
+  write_file "$UPD/llm.json" <<EOF
+{"state": "$1", "model": $(jstr "${model:-qwen2.5:7b-instruct}"), "updated_at": "$(now_iso)", "error": $(jopt "${2:-}")}
+EOF
+}
+
+llm_containers() {
+  docker ps -aq --filter "label=com.docker.compose.project=$(project_name)" --filter "label=com.docker.compose.service=ollama"
+}
+
+llm_enable() {
+  local rc=0
+  : >"$UPD/llm.log"
+  chmod 644 "$UPD/llm.log"
+  llm_state installing
+  (
+    set -e
+    echo "Enabling Local LLM ($(now_iso))"
+    profile_add llm
+    echo "==> Starting the ollama container (image pulled on first use)"
+    compose up -d ollama
+    wait_healthy ollama 300 || { echo "ollama did not become healthy"; exit 1; }
+    llm_state pulling
+    echo "==> Model"
+    llm_pull_model
+  ) >>"$UPD/llm.log" 2>&1 || rc=$?
+  if [ "$rc" -eq 0 ]; then
+    echo "Local LLM ready ($(now_iso))" >>"$UPD/llm.log"
+    llm_state ready
+    log "local LLM enabled"
+  else
+    local last
+    last="$(sed -e 's/\x1b\[[0-9;]*m//g' "$UPD/llm.log" | grep -v '^\s*$' | tail -1)"
+    llm_state failed "exit $rc: ${last:-see llm.log}"
+    log "local LLM enable failed ($rc)"
+  fi
+  return "$rc"
+}
+
+llm_disable() {
+  local ids
+  profile_remove llm
+  ids="$(llm_containers)"
+  # shellcheck disable=SC2086
+  [ -n "$ids" ] && docker rm -f $ids >/dev/null
+  if [ "${1:-}" = remove ]; then
+    docker volume rm -f "$(project_name)_ollama" >/dev/null 2>&1 || true
+    rm -f "$INSTALL_DIR/data/llm/ollama-models.tgz"
+    llm_state removed
+    log "local LLM removed (container and model)"
+  else
+    llm_state disabled
+    log "local LLM disabled (model kept)"
+  fi
 }
 
 process() {
@@ -251,6 +315,9 @@ process() {
     elif [[ "$name" =~ ^[0-9]+-channel-(production|development)$ ]]; then set_channel "${BASH_REMATCH[1]}" && releases || true
     elif [[ "$name" =~ ^[0-9]+-install-([0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?)$ ]]; then
       install_version "${BASH_REMATCH[1]}" && check || true
+    elif [[ "$name" =~ ^[0-9]+-llm-enable$ ]]; then llm_enable || true
+    elif [[ "$name" =~ ^[0-9]+-llm-disable$ ]]; then llm_disable || true
+    elif [[ "$name" =~ ^[0-9]+-llm-remove$ ]]; then llm_disable remove || true
     else
       log "ignored unknown request $name"
     fi
@@ -265,6 +332,9 @@ while [ $# -gt 0 ]; do
     --process|--check|--connectivity) ACTION="${1#--}"; shift ;;
     --channel) ACTION=channel; ARG="${2:-}"; shift 2 ;;
     --version) ACTION=install; ARG="${2#v}"; shift 2 ;;
+    --llm)
+      case "${2:-}" in enable|disable|remove) ;; *) die "--llm must be enable, disable or remove" ;; esac
+      ACTION=llm; ARG="$2"; shift 2 ;;
     --endpoints-override) OVERRIDE+=("$2"); shift 2 ;;
     -h|--help) sed -n '2,15p' "$AIOPS_UPDATER_SELF" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) die "unknown option $1" ;;
@@ -281,4 +351,6 @@ case "$ACTION" in
   connectivity) connectivity; write_status ;;
   channel) set_channel "$ARG" ;;
   install) recover_interrupted; install_version "$ARG" && check ;;
+  llm)
+    case "$ARG" in enable) llm_enable ;; disable) llm_disable ;; remove) llm_disable remove ;; esac ;;
 esac

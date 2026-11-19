@@ -51,6 +51,10 @@ class WrongSiteDetection(TaskDefinition):
     default_max_auto_per_run = 20
     action_types = {"reassign_site": "Move device to another site (no provisioning, no config push)"}
     llm_system_prompt = LLM_SYSTEM
+    ai_features = {
+        "proposal_review": "Second opinion on mid-confidence moves (can lower confidence, raise it by at most 5)",
+        "naming_convention": "Learns the site naming convention from assigned devices as an extra evidence signal",
+    }
     params = SIGNAL_PARAMS + [
         ParamSpec("include_aps", "Check access points", "bool", True),
         ParamSpec("include_switches", "Check switches", "bool", True),

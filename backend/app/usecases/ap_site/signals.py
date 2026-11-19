@@ -17,7 +17,12 @@ from app.store import cache_get, cache_set
 from app.usecases.ap_site.learners import (
     KeyBuildingModel, NamePrefixModel, Prediction, SiteIndex, direct_building_match, normalize_tag, subnet_key,
 )
+from app.usecases.ap_site.naming import learn_site_naming, short_name
 from app.usecases.ap_site.scoring import SIGNALS, SIGNAL_LABELS, SignalVote, rssi_weight, share
+
+AI_NAMING_WEIGHT = 0.10
+AI_NAMING_MAX_WEIGHT = 0.15
+DEFAULT_OPTIONAL_WEIGHTS = {"geoip": 0.15, "ai_naming": AI_NAMING_WEIGHT}
 
 
 class SiteSignals:
@@ -27,7 +32,8 @@ class SiteSignals:
         self.by_id = {d.id: d for d in inv.devices}
         self.assignments = inv.assignments
         self.available = {"uplink": True, "rf": bool(params.get("rf_enabled", True)), "name": True,
-                          "tag": bool(params.get("ap_config_enabled", True)), "subnet": True, "geoip": False}
+                          "tag": bool(params.get("ap_config_enabled", True)), "subnet": True, "geoip": False,
+                          "ai_naming": False}
 
         self.neighbors: dict[str, set[str]] = defaultdict(set)
         self.ports: dict[tuple[str, str], str] = {}
@@ -43,9 +49,13 @@ class SiteSignals:
         assigned = [d for d in inv.devices if d.id in self.assignments]
         assigned_aps = [d for d in assigned if d.is_ap]
         name_src = assigned_aps if name_learning == "aps" else assigned
+        name_pairs = [(d.hostname, self.assignments[d.id]) for d in name_src]
         self.name_model = NamePrefixModel(index, int(params.get("name_min_samples", 3)),
-                                          float(params.get("name_min_purity", 0.8))).fit(
-            [(d.hostname, self.assignments[d.id]) for d in name_src])
+                                          float(params.get("name_min_purity", 0.8))).fit(name_pairs)
+        self.ai_naming = None
+        if float(params.get("weight_ai_naming", AI_NAMING_WEIGHT)) > 0 and params.get("ai_naming_enabled", True):
+            self.ai_naming = learn_site_naming(ctx, index, name_pairs, name_learning)
+            self.available["ai_naming"] = self.ai_naming is not None
         self.subnet_model = KeyBuildingModel(index).fit(
             [(subnet_key(d.mgmt_ip), self.assignments[d.id]) for d in assigned])
 
@@ -94,7 +104,8 @@ class SiteSignals:
             else:
                 ctx.log("GeoIP signal: not configured (optional)")
 
-        self.weights = {s: float(params.get(f"weight_{s}", 0.15 if s == "geoip" else 0.0)) for s in SIGNALS}
+        self.weights = {s: float(params.get(f"weight_{s}", DEFAULT_OPTIONAL_WEIGHTS.get(s, 0.0))) for s in SIGNALS}
+        self.weights["ai_naming"] = min(self.weights["ai_naming"], AI_NAMING_MAX_WEIGHT)
 
     def log_available(self) -> None:
         self.ctx.log("Signals available: " + ", ".join(f"{SIGNAL_LABELS[k]}={'yes' if v else 'no'}"
@@ -110,6 +121,7 @@ class SiteSignals:
             "tag": self._tag_vote(self.configs.get(dev.id)) if dev.is_ap else None,
             "subnet": self._subnet_vote(dev),
             "geoip": self._geoip_vote(dev) if self.geoip is not None else None,
+            "ai_naming": self._ai_naming_vote(dev) if self.ai_naming is not None else None,
         }
         return {k: x for k, x in v.items() if x is not None}
 
@@ -180,6 +192,18 @@ class SiteSignals:
         return SignalVote("name", {b: pred.purity}, floors,
                           f"Prefix '{pred.key}' maps to {self.index.short(pred.site_id)} "
                           f"({round(pred.purity * pred.samples)} of {pred.samples} devices)")
+
+    def _ai_naming_vote(self, dev: Device) -> SignalVote | None:
+        pred = self.ai_naming.predict(dev.hostname)
+        if not pred:
+            return None
+        b, floor = pred
+        strength = self.ai_naming.accuracy
+        floors = {floor: self.ai_naming.floor_accuracy or 0.0} if floor and self.ai_naming.floor_accuracy else {}
+        where = self.index.short(floor or b)
+        return SignalVote("ai_naming", {b: strength}, floors,
+                          f"AI-learned convention maps '{short_name(dev.hostname)}' to {where} "
+                          f"(validated on {self.ai_naming.matched} assigned devices, {strength:.0%} correct)")
 
     def _tag_vote(self, cfg: dict | None) -> SignalVote | None:
         if not cfg:

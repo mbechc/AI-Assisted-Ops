@@ -34,6 +34,8 @@ SIGNAL_PARAMS = [
     ParamSpec("weight_tag", "Weight: AP site tag / location", "float", 0.10),
     ParamSpec("weight_subnet", "Weight: management subnet", "float", 0.05),
     ParamSpec("weight_geoip", "Weight: GeoIP (only used when a GeoIP source is configured)", "float", 0.15),
+    ParamSpec("weight_ai_naming", "Weight: AI-learned naming convention (only with AI on; max 0.15)", "float", 0.10),
+    ParamSpec("ai_naming_enabled", "AI: learn the naming convention (only with AI on)", "bool", True),
     ParamSpec("name_min_samples", "Name model: minimum samples", "int", 3),
     ParamSpec("name_min_purity", "Name model: minimum purity", "float", 0.8),
     ParamSpec("ap_config_enabled", "Use AP configuration (site tag / location)", "bool", True),
@@ -161,6 +163,10 @@ class ApSiteAssignment(TaskDefinition):
     default_max_auto_per_run = 100
     action_types = {"assign_site": "Assign device to site (no provisioning, no config push to the WLC)"}
     llm_system_prompt = LLM_SYSTEM
+    ai_features = {
+        "proposal_review": "Second opinion on mid-confidence proposals (can lower confidence, raise it by at most 5)",
+        "naming_convention": "Learns the site naming convention from assigned devices as an extra evidence signal",
+    }
     params = SIGNAL_PARAMS + [
         ParamSpec("ap_require_floor", "APs must be assigned to a floor", "bool", True,
                   "When the floor cannot be determined the item requires an operator floor choice."),
