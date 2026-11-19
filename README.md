@@ -39,7 +39,7 @@ assurance, maps and reports. AIOps works through that backlog continuously.
 (default weight 0.15); a proposal backed only by GeoIP is capped at confidence 60 and never executed
 automatically.
 
-## How AI is used
+## AI is Optional
 
 Every task is an **Expert Task**: rules and evidence from Catalyst Center make the proposals, and every
 task works fully without AI. AI is an optional assistant on top. Choose one of three modes under
@@ -51,22 +51,7 @@ task works fully without AI. AI is an optional assistant on top. Choose one of t
 | **Local LLM** | Ollama on the appliance (CPU), installed only when you select it | No | |
 | **Azure OpenAI** | Your Azure OpenAI deployment (Microsoft's enterprise LLM service, the models behind Copilot) | Yes, to your Azure tenant | |
 
-Where AI adds value, and what happens without it:
-
-| Use | Task | With AI | Without AI |
-|---|---|---|---|
-| Second opinion on proposals | AP site assignment, Wrong-site detection | Reviews the evidence; can lower confidence a lot, raise it by at most 5 | Confidence from the evidence alone |
-| Naming conventions | AP site assignment, Wrong-site detection, AP hostname reset | Learns irregular naming schemes (city codes, aliases, odd templates); used only after it rebuilds at least 95% of known names | Prefix and number rules |
-| Rename detection | Site hierarchy drift | Confirms ambiguous delete-and-recreate renames | Clear renames found by name normalising and similarity |
-| Reviewer feedback | Every task (Calibration and feedback tab) | Summarises reviewer notes into themes and suggested parameter changes (advice only) | Rejection and override rates per group and evidence signal |
-| Shift summary | Dashboard | Short handover narrative | The same facts as a list |
-| Owner reports | Telemetry baseline | Ticket-ready wording per failure cause | Template ticket text |
-
-The task list labels each task: blue **AI Capable** when the task can use AI but AI is off, green
-**Local AI Assisted** or **Cloud AI Assisted** when it is on. Tasks without an AI feature have no label.
-AI never executes anything itself: it only adjusts confidence or wording, every AI answer is validated,
-and the rules decide. See [docs/AI_USAGE.md](docs/AI_USAGE.md) for what is sent, the safety model and an
-FAQ.
+[How AI is implemented](docs/AI_USAGE.md)
 
 ## Getting started
 
