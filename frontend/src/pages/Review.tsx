@@ -145,7 +145,7 @@ function GroupsView({ groups, taskName, sourceName, showSource, onOpen, onBulk }
         <thead>
           <tr>
             <th>Group</th>{showTask && <th>Task</th>}{showSource && <th>Catalyst Center</th>}
-            <th className="num">Items</th><th className="num">Avg conf.</th><th className="num">Range</th>
+            <th className="num">Items</th><th className="num">Avg conf.</th>
             <th className="num">&gt;= threshold</th><th className="num">Need choice</th><th />
           </tr>
         </thead>
@@ -157,7 +157,6 @@ function GroupsView({ groups, taskName, sourceName, showSource, onOpen, onBulk }
               {showSource && <td className="small">{sourceName(g.source_id)}</td>}
               <td className="num">{g.count}</td>
               <td className="num"><Confidence value={Math.round(g.avg_confidence)} small /></td>
-              <td className="num small muted">{g.min_confidence}-{g.max_confidence}</td>
               <td className="num">{g.above_threshold}</td>
               <td className="num">{g.blocked || ""}</td>
               <td className="num" onClick={(e) => e.stopPropagation()}>
@@ -169,7 +168,7 @@ function GroupsView({ groups, taskName, sourceName, showSource, onOpen, onBulk }
               </td>
             </tr>
           ))}
-          {!groups.length && <tr><td colSpan={9} className="muted">Nothing matches the filters.</td></tr>}
+          {!groups.length && <tr><td colSpan={8} className="muted">Nothing matches the filters.</td></tr>}
         </tbody>
       </table>
     </div>
