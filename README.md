@@ -66,7 +66,15 @@ Network: HTTPS from the host to your Catalyst Center(s), and to GitHub for insta
 
 ### Install
 
-One command, run on the host:
+The one-line install needs `curl` and `sudo`. Minimal Debian installs often have neither (Debian leaves
+out `sudo` when a root password is set during installation), so install them first as root (`su -`):
+
+```bash
+apt-get update && apt-get install -y curl sudo   # Debian / Ubuntu
+dnf install -y curl sudo                         # RHEL / Rocky / AlmaLinux
+```
+
+Then run one command on the host:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/mbechc/AI-Assisted-Ops/master/get-aiops.sh | sudo bash
