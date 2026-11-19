@@ -1,6 +1,6 @@
 # AIOps: AI-Assisted Operations for Cisco Catalyst Center
 
-**Your network's night shift: an expert system that clears the repetitive Catalyst Center backlog, shows
+**An expert system that clears the 80% repetitive Catalyst Center tasks, shows
 its evidence, and only acts as autonomously as you allow. AI is optional, local or in your own Azure
 tenant.**
 
@@ -116,7 +116,7 @@ curl -fsSL https://raw.githubusercontent.com/mbechc/AI-Assisted-Ops/master/get-a
 | `--hostname NAME` | Name in the TLS certificate and portal URL |
 | `--admin-password PW` | Set the initial admin password instead of generating one |
 | `--https-port N` / `--http-port N` | Published ports (default 443/80) |
-| `--with-mock` | Also start two simulated Catalyst Centers (2.3.5.6 and 3.1.3.0) for evaluation |
+| `--with-mock` | Also start two simulated Catalyst Centers (2.3.5.6 and 3.1.3.0) for evaluation. See [what the mocks simulate](docs/MOCKS.md) |
 
 Behind a proxy: `export https_proxy=http://proxy:3128` and run `sudo -E bash` instead of `sudo bash`;
 configure the Docker daemon proxy as well, so image pulls work.
