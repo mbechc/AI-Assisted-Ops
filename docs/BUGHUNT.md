@@ -9,7 +9,9 @@ Status: **open**, **fixed in X.Y.Z** or **won't fix**.
 |---|---|---|---|
 | 1 | Login | The Apple Passwords app (and Safari/iCloud Keychain) does not recognise the login form, so it neither fills in nor offers to save the username and password | open |
 | 2 | Dashboard | "Since last shift" shows a raw Python traceback for a failed run instead of a short, readable message | open |
-| 3 | Wrong-site detection | Run 27 failed with a database error (SQLAlchemy `do_execute`); cause not yet known | open |
+| 3 | Wrong-site detection | Run 27 failed with a database error: two tasks wrote the same cache entry at the same time (`duplicate key ... cache_entries_pkey`) | open |
+| 4 | Installer | Redis warns at every start that memory overcommit is disabled (`vm.overcommit_memory`) | open |
+| 5 | Workers | worker-inventory restarted on 19 Nov 16:22 while a run was active (run marked failed as orphaned); cause unknown | open, needs info |
 
 ## Notes
 
@@ -39,6 +41,39 @@ places where exception text reaches the UI as well.
 
 ### 3. Wrong-site detection run 27 failed
 
-Seen on the lab appliance (0.2.5-dev.2, with mocks) via the shift summary. The visible part of the
-traceback only shows that a database statement failed. Needed: the end of the error from **Runs → run 27**
-(or `docker compose logs worker-inventory`) to find the cause.
+Seen on the lab appliance (0.2.5-dev.2, with mocks). The Postgres log shows
+`duplicate key value violates unique constraint "cache_entries_pkey"` at 06:54:08.112, and run 27
+(`site_reassignment`) failed at 06:54:08.220.
+
+Cause: `cache_set` in `backend/app/store.py` reads the row and inserts it when missing. AP site assignment
+(worker-wireless) and Wrong-site detection (worker-inventory) share cache keys (the site list per source and
+the per-AP RF neighbour and AP configuration caches) and run at nearly the same time in the morning. When
+both insert the same new key, the second insert fails and the whole run fails with it.
+
+Likely fix: make `cache_set` an upsert (`INSERT ... ON CONFLICT (key) DO UPDATE` on PostgreSQL, the SQLite
+equivalent in tests), so concurrent writers never fail. A cache write should also never fail a run. Add a
+test with two sessions writing the same key.
+
+### 4. Redis memory overcommit warning
+
+Redis logs `WARNING Memory overcommit must be enabled!` at every start. Without it a background save can
+fail under memory pressure.
+
+Likely fix: the installer writes `vm.overcommit_memory = 1` to `/etc/sysctl.d/90-aiops.conf` and applies it
+with `sysctl --system` (it is a host kernel setting; a container cannot set it). Mention it in the README
+and in `uninstall.sh --purge`.
+
+### 5. worker-inventory restarted during a run
+
+On 19 Nov at 16:22 worker-inventory started, found a run that was still marked running and marked it as
+failed (`marked 1 orphaned run(s)`). That is the intended recovery; the open question is why the worker
+restarted. If nobody restarted or updated the appliance at that time, check for an out-of-memory kill:
+`docker inspect aiops-worker-inventory-1 --format '{{.State.OOMKilled}} {{.RestartCount}}'` and
+`journalctl -k | grep -i oom`.
+
+### Not bugs (checked)
+
+- `Catalyst Center GET ... -> 429, retry in 1s`: the mocks return HTTP 429 on about every 250th request on
+  purpose, to test retries. The request succeeds on the retry.
+- `FATAL: terminating connection due to administrator command` (Postgres, 19 Nov 15:36): Postgres was
+  stopped or restarted (installation, update or `docker compose` restart) and closed its open connections.
