@@ -2,14 +2,12 @@ import { useState } from "react";
 import { useAuth } from "../App";
 import { api } from "../api";
 import { ErrorLine, Level, useAsync } from "../components";
-import AiSection from "../AiSection";
-import UpdatesSection from "../UpdatesSection";
 
 interface GlobalSettings { kill_switch: boolean; global_autonomy_cap: number }
 
 const CAP_TEXT = ["Report only everywhere", "Human review everywhere", "Auto above threshold allowed", "Full autonomy allowed"];
 
-export default function Settings() {
+export default function Automation() {
   const { can } = useAuth();
   const admin = can("admin");
   const s = useAsync(() => api.get<GlobalSettings>("/settings"), []);
@@ -25,7 +23,7 @@ export default function Settings() {
 
   return (
     <>
-      <div className="page-head"><div><h1>Settings</h1></div></div>
+      <div className="page-head"><div><h1>Automation</h1><p className="sub">How much AIOps may change on its own, for every Expert Task.</p></div></div>
       <ErrorLine error={err || s.error} />
       {s.data && (
         <div className="grid cols-2">
@@ -57,8 +55,6 @@ export default function Settings() {
           </div>
         </div>
       )}
-      <div style={{ marginTop: 16 }}><AiSection /></div>
-      <div style={{ marginTop: 16 }}><UpdatesSection /></div>
     </>
   );
 }

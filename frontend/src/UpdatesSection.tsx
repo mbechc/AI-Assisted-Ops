@@ -5,7 +5,7 @@ import { Connectivity, UpdateState } from "./types";
 
 const TRACKS = [
   { key: "production", label: "Production", text: "Stable releases only." },
-  { key: "development", label: "Development", text: "Every release, including pre-releases (vX.Y.Z-dev.N)." },
+  { key: "development", label: "Development", text: "Every release, including pre-releases (YYYY.M.R-dev.N)." },
 ] as const;
 
 export function ConnectivityChip({ c, onClick }: { c: Connectivity; onClick?: () => void }) {
@@ -32,10 +32,6 @@ export default function UpdatesSection() {
   const ref = useRef<HTMLDivElement>(null);
   const d = st.data;
 
-  useEffect(() => {
-    if (d && window.location.hash === "#updates") ref.current?.scrollIntoView({ behavior: "smooth" });
-  }, [!!d]);
-
   // Refresh finishes when a newer connectivity result arrives, or times out if the host updater is missing.
   useEffect(() => {
     if (refreshing === null || !d) return;
@@ -55,7 +51,7 @@ export default function UpdatesSection() {
     }
   };
 
-  if (!d) return <div className="card" id="updates"><h2>Updates</h2><ErrorLine error={st.error} /></div>;
+  if (!d) return <div className="card" id="updates"><ErrorLine error={st.error} /></div>;
   const c = d.connectivity;
   const manage = d.can_manage;
   const inst = d.install;
@@ -65,7 +61,7 @@ export default function UpdatesSection() {
   return (
     <div className="card updates" id="updates" ref={ref}>
       <div className="row" style={{ justifyContent: "space-between" }}>
-        <h2 style={{ margin: 0 }}>Updates</h2>
+        <span className="muted small">Internet connectivity of the host</span>
         <ConnectivityChip c={c} />
       </div>
       <ErrorLine error={err || st.error} />

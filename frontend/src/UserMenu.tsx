@@ -53,7 +53,7 @@ export default function UserMenu() {
           </div>
           <div className="sep" />
           {update && (
-            <button className="item" role="menuitem" onClick={() => { setOpen(false); nav("/settings#updates"); }}>
+            <button className="item" role="menuitem" onClick={() => { setOpen(false); nav("/updates"); }}>
               Update available: {update.version}
             </button>
           )}

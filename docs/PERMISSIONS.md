@@ -25,7 +25,9 @@ address directly goes back to the Dashboard.
 | **Configure** | Expert Tasks (and each task's page) | - | - | yes |
 | | Data sources (and Manage GeoIP) | - | - | yes |
 | | Users | - | - | yes |
-| | Settings (autonomy cap, kill switch, AI assistance, updates) | - | - | yes |
+| | Automation (global autonomy cap, kill switch) | - | - | yes |
+| | AI assistance | - | - | yes |
+| | Updates | - | - | yes |
 | **Observe** | Expert Task history | yes | yes | yes |
 | | Runners | yes | yes | yes |
 | | Container logs | - | - | yes |
@@ -52,10 +54,10 @@ The whole **Configure** group is visible to admins only.
 | AI reviewer insights and AI owner reports | Expert Tasks | - | - | yes |
 | Add, edit, delete and test data sources | Data sources | - | - | yes |
 | Upload GeoIP databases, choose fields, edit GeoIP mappings | Data sources → Manage GeoIP | - | - | yes |
-| Create users, change roles, disable users, reset passwords | Users | - | - | yes |
-| Global autonomy cap, kill switch | Settings | - | - | yes |
-| AI mode (No AI, Local LLM, Azure OpenAI) | Settings | - | - | yes |
-| Update track, check and install updates | Settings | - | - | yes |
+| Create, delete and disable users, change roles, reset passwords | Users | - | - | yes |
+| Global autonomy cap, kill switch | Automation | - | - | yes |
+| AI mode (No AI, Local LLM, Azure OpenAI) | AI assistance | - | - | yes |
+| Update track, check and install updates | Updates | - | - | yes |
 | Follow container logs | Container logs | - | - | yes |
 | Read the audit trail | Audit log | - | - | yes |
 | Change own password and theme | User menu | yes | yes | yes |

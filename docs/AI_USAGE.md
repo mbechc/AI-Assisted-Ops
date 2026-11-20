@@ -12,7 +12,7 @@ answers common questions.
 ## Summary
 
 - Three modes: **No AI** (default), **Local LLM** (on the appliance) and **Azure OpenAI** (in your Azure
-  tenant). Admins switch under **Settings → AI assistance**.
+  tenant). Admins switch under **Configure → AI assistance**.
 - No AI downloads nothing: there is no LLM container until an admin selects Local LLM.
 - AI never makes a change on its own. It lowers or slightly raises confidence, suggests, or rewrites text.
   Executions still go through the autonomy levels, thresholds and caps you set.
@@ -45,7 +45,7 @@ host updater (the same root-owned systemd service that installs updates) to:
 
 1. add the `llm` compose profile to `.env` and start the `ollama` container;
 2. download the model (or import `data/llm/ollama-models.tgz` on air-gapped hosts);
-3. report progress and a log back to the Settings page.
+3. report progress and a log back to the AI assistance page.
 
 Until the model is ready, tasks keep running without AI. **Remove model** (or leaving Local LLM with
 *delete model* ticked) stops the container and deletes the model; without the tick the model is kept for
@@ -64,7 +64,7 @@ controls. You provide:
   *Cognitive Services OpenAI User* role on the resource.
 
 Secrets are encrypted in the database with the appliance key and are never returned to the browser or
-written to the audit log. **Test connection** sends a tiny probe prompt before you save. The Settings page
+written to the audit log. **Test connection** sends a tiny probe prompt before you save. The AI assistance page
 shows a warning that inventory data will leave the host.
 
 ## Where AI adds value

@@ -43,7 +43,7 @@ automatically.
 
 Every task is an **Expert Task**: rules and evidence from Catalyst Center make the proposals, and every
 task works fully without AI. AI is an optional assistant on top. Choose one of three modes under
-**Settings → AI assistance**:
+**Configure → AI assistance**:
 
 | Mode | What runs | Data leaves the host | Default |
 |---|---|---|---|
@@ -112,7 +112,7 @@ curl -fsSL https://raw.githubusercontent.com/mbechc/AI-Assisted-Ops/master/get-a
 |---|---|
 | `--dir DIR` | Installation folder (default `/opt/AIOps`) |
 | `--channel production\|development` | Update track (default `production`) |
-| `--version X.Y.Z` | Install a specific release |
+| `--version YYYY.M.R` | Install a specific release, for example `2026.11.0` |
 | `--hostname NAME` | Name in the TLS certificate and portal URL |
 | `--admin-password PW` | Set the initial admin password instead of generating one |
 | `--https-port N` / `--http-port N` | Published ports (default 443/80) |
@@ -130,7 +130,7 @@ configure the Docker daemon proxy as well, so image pulls work.
    the proposals in the **Inbox** (what needs a human now; **History** shows what was decided or
    automated). Schedules are cron expressions in UTC with presets on the task page.
 4. As calibration builds up (approved vs. rejected per confidence band), raise the autonomy level. Every
-   task has a cap; the global cap and the kill switch are under **Settings**. The global cap starts at
+   task has a cap; the global cap and the kill switch are under **Configure → Automation**. The global cap starts at
    L1 (human review) on a fresh install. Effective level = min(selected, task cap, global cap).
 5. **Site hierarchy drift**: approve the current hierarchy as the baseline on the task page; later runs
    report changes against it.
@@ -145,7 +145,7 @@ configure the Docker daemon proxy as well, so image pulls work.
 
 ### Enabling AI
 
-Admins choose the mode under **Settings → AI assistance**. Switching is possible at any time; the next
+Admins choose the mode under **Configure → AI assistance**. Switching is possible at any time; the next
 task run uses the new mode.
 
 - **Local LLM**: confirm, and the host updater starts the Ollama container and downloads the model
@@ -169,7 +169,7 @@ when you point at them (or click or tab to them):
 | Group | Pages | Who |
 |---|---|---|
 | **Work** | Dashboard, Inbox (what needs a human now), History (what was decided or automated) | Everyone; operators and admins decide |
-| **Configure** | Expert Tasks, Data sources, Users, Settings | Admins only |
+| **Configure** | Expert Tasks, Data sources, Automation, AI assistance, Updates, Users | Admins only |
 | **Observe** | Expert Task history, Runners, Container logs, Audit log | Everyone; Container logs and Audit log admins only |
 
 Users have one of three roles: viewer (read only), operator (decides in the Inbox) and admin (everything).
@@ -177,13 +177,18 @@ See [Roles and permissions](docs/PERMISSIONS.md) for every page and action.
 
 ## Updates
 
-**Settings → Updates** shows the installed version, the track and the newest release for that track.
-Settings is admin-only; admins switch track, refresh and install.
+**Configure → Updates** (admins only) shows the installed version, the track and the newest release for that
+track; admins switch track, refresh and install.
+
+Versions follow the calendar: **year.month.revision**, for example `2026.11.0` for the first stable release
+of November 2026 and `2026.11.1` for the next one that month. Development builds towards a release carry
+`-dev.N`, for example `2026.11.0-dev.3`. Releases before November 2026 used `0.x.y`; every calendar version
+is newer than those.
 
 | Track | Offers |
 |---|---|
-| **Production** | Stable releases (`vX.Y.Z`) only |
-| **Development** | Every release, including pre-releases (`vX.Y.Z-dev.N`) |
+| **Production** | Stable releases (`vYYYY.M.R`) only |
+| **Development** | Every release, including pre-releases (`vYYYY.M.R-dev.N`) |
 
 Switching back from Development to Production takes effect with the next Production release that is the
 same version or newer; older versions are never offered.
@@ -219,7 +224,7 @@ host, which writes its results back to `data/update`. From the shell:
 ```bash
 sudo /opt/AIOps/scripts/update.sh --check            # reachability and release lookup
 sudo /opt/AIOps/scripts/update.sh --channel development
-sudo /opt/AIOps/scripts/update.sh --version 0.3.0
+sudo /opt/AIOps/scripts/update.sh --version 2026.11.0
 ```
 
 **Rollback**: restore the backup taken right before the update without migrating it, then install the
@@ -275,8 +280,11 @@ make deploy HOST=root@<host> INSTALL_ARGS="--yes --build --with-mock"   # builds
 
 1. Set the version in `VERSION` (and `frontend/package.json`, `backend/app/config.py`,
    the image defaults in `docker-compose.yml`).
-2. Commit, then tag and push: `git tag v0.3.0 && git push origin v0.3.0`. Use `v0.3.0-dev.1` for a
-   Development pre-release.
+2. Commit, then tag and push: `git tag -a v2026.11.0 -m "AIOps 2026.11.0" && git push origin v2026.11.0`.
+   Versions are year.month.revision without leading zeros (`2026.1.0` for January); the revision counts
+   stable releases within the month, starting at 0. Use `v2026.11.0-dev.1`, `-dev.2`, ... for Development
+   pre-releases leading up to `2026.11.0`; after that stable release the next pre-release is
+   `2026.11.1-dev.1` (or `2026.12.0-dev.1` in a new month).
 3. The `release` workflow runs the tests, pushes `ghcr.io/mbechc/aiops-backend` and `aiops-web` with that
    version, and publishes the GitHub Release with `aiops-<version>.tar.gz` and `SHA256SUMS`. Tags with a
    `-` are marked as pre-releases and only offered on the Development track.

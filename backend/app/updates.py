@@ -38,7 +38,7 @@ def _ts(v: str | None) -> datetime | None:
 
 
 def version_key(v: str) -> tuple:
-    """Semantic order: 0.2.1 > 0.2.1-dev.3 > 0.2.1-dev.2 > 0.2.0."""
+    """Order: 2026.11.0 > 2026.11.0-dev.3 > 2026.11.0-dev.2 > 0.2.5 (calendar versions; 0.x.y came before)."""
     main, _, pre = v.partition("-")
     nums = tuple(int(p) for p in main.split("."))
     if not pre:

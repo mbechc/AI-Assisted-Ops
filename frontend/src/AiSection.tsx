@@ -58,7 +58,7 @@ export default function AiSection() {
     }
   };
 
-  if (!d || !form) return <div className="card" id="ai"><h2>AI assistance</h2><ErrorLine error={st.error} /></div>;
+  if (!d || !form) return <div className="card" id="ai"><ErrorLine error={st.error} /></div>;
   const manage = d.can_manage;
   const local = d.local;
   const localBusy = BUSY.includes(local.state);
@@ -109,14 +109,9 @@ export default function AiSection() {
   return (
     <div className="card" id="ai">
       <div className="row" style={{ justifyContent: "space-between" }}>
-        <h2 style={{ margin: 0 }}>AI assistance</h2>
+        <span className="muted small">Current mode</span>
         <AiModeChip mode={d.effective_mode} />
       </div>
-      <p className="small muted">
-        Optional for every Expert Task: all tasks work on rules alone, and AI never executes a change. With AI on,
-        AI-capable tasks get a second opinion on proposals, learn naming conventions, recognise site renames and write
-        summaries. See <a href="https://github.com/mbechc/AI-Assisted-Ops/blob/master/docs/AI_USAGE.md" target="_blank" rel="noreferrer">AI usage</a>.
-      </p>
       <ErrorLine error={err || st.error} />
       {local.updater_stale && (
         <div className="banner warn">

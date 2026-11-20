@@ -3,7 +3,7 @@
 Small bugs and polish items, collected here and fixed together in a later release. Adding an item does not
 trigger a fix or a new version.
 
-Status: **open**, **fixed in X.Y.Z** or **won't fix**.
+Status: **open**, **fixed in &lt;version&gt;** or **won't fix**.
 
 | # | Area | Problem | Status |
 |---|---|---|---|
@@ -15,6 +15,11 @@ Status: **open**, **fixed in X.Y.Z** or **won't fix**.
 | 6 | UI | Sidebar subtitle "Catalyst Center operations assistant" should read "IT Operations Assistant": AIOps will cover more products than Catalyst Center | fixed in 0.2.5-dev.7 |
 | 7 | Inbox | The "By group" table looks cluttered: remove the ">= Threshold" and "Need choice" columns and the per-group Approve button | fixed in 0.2.5-dev.7 |
 | 8 | Expert Tasks | The category cards (Collector, Wireless / Inventory hygiene, ...) are always fully open, which makes the page hard to overview: collapse them to their headline and expand one at a time | fixed in 0.2.5-dev.8 |
+| 9 | Configure | Settings was a mixed bag: split into Automation (kill switch, global autonomy cap), AI assistance and Updates under Configure | fixed in 2026.11.0-dev.1 |
+| 10 | Expert Tasks | Task detail sections collapse like the category cards, one open at a time | fixed in 2026.11.0-dev.1 |
+| 11 | Users | Users cannot be deleted, only disabled | fixed in 2026.11.0-dev.1 |
+| 12 | UI | Blue dots (as on a Tesla screen) on every menu item and group that leads to a change the user has not seen; gone once the page is opened | fixed in 2026.11.0-dev.1 |
+| 13 | Releases | Versions follow the calendar: year.month.revision (2026.11.0), Development builds `-dev.N` | fixed in 2026.11.0-dev.1 |
 
 ## Notes
 

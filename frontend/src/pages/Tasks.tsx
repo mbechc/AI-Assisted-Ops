@@ -39,7 +39,7 @@ export default function Tasks() {
           <p className="sub">
             Every use case is an Expert Task that runs on a schedule and produces work items with a confidence score.
             <span className="badge ai" style={{ margin: "0 4px 0 8px" }}>AI Capable</span>runs on rules, AI off;
-            <span className="badge ai-on" style={{ margin: "0 4px 0 8px" }}>AI Assisted</span>uses the AI selected in Settings.
+            <span className="badge ai-on" style={{ margin: "0 4px 0 8px" }}>AI Assisted</span>uses the AI selected under Configure, AI assistance.
           </p>
         </div>
       </div>

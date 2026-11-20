@@ -46,6 +46,10 @@ def test_semantic_order():
     assert version_gt("0.2.1-dev.10", "0.2.1-dev.9")
     assert version_gt("0.2.1-dev.1", "0.2.0")
     assert not version_gt("0.2.0", "0.2.0")
+    assert version_gt("2026.11.0-dev.1", "0.2.5-dev.8"), "calendar versions follow 0.x.y"
+    assert version_gt("2026.11.0", "2026.11.0-dev.12")
+    assert version_gt("2026.12.0-dev.1", "2026.11.3")
+    assert version_gt("2027.1.0", "2026.12.4")
     assert version_gt("0.10.0", "0.9.9")
 
 

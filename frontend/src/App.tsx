@@ -5,6 +5,7 @@ import { useAsync } from "./components";
 import { applyTheme } from "./theme";
 import { Role, User } from "./types";
 import UserMenu from "./UserMenu";
+import { NewDot, NewHere, NewsProvider, useNews } from "./whatsNew";
 import Login from "./pages/Login";
 import Dashboard from "./pages/Dashboard";
 import Tasks from "./pages/Tasks";
@@ -17,7 +18,9 @@ import Sources from "./pages/Sources";
 import GeoipSource from "./pages/GeoipSource";
 import Audit from "./pages/Audit";
 import Users from "./pages/Users";
-import Settings from "./pages/Settings";
+import Automation from "./pages/Automation";
+import AiAssistance from "./pages/AiAssistance";
+import Updates from "./pages/Updates";
 
 const RANK: Record<Role, number> = { viewer: 0, operator: 1, admin: 2 };
 
@@ -121,7 +124,27 @@ function ConnectionBanner() {
 }
 
 function Shell() {
+  const { user, can } = useAuth();
+  return (
+    <NewsProvider username={user.username} admin={can("admin")}>
+      <ShellBody />
+    </NewsProvider>
+  );
+}
+
+/** Menu link with a blue dot while its page has changes the user has not seen. */
+function Item({ to, end, children }: { to: string; end?: boolean; children: ReactNode }) {
+  const { hasNew } = useNews();
+  return (
+    <NavLink to={to} end={end}>
+      <span>{children}{hasNew(to) && <NewDot />}</span>
+    </NavLink>
+  );
+}
+
+function ShellBody() {
   const { can } = useAuth();
+  const { hasNew } = useNews();
   const { data: summary } = useAsync(() => api.get<Record<string, Record<string, number>>>("/items/summary"), [], 30000);
   const { data: settings } = useAsync(() => api.get<{ kill_switch: boolean; global_autonomy_cap: number }>("/settings"), [], 30000);
   const pending = Object.values(summary || {}).reduce((n, s) => n + (s.proposed || 0), 0);
@@ -136,24 +159,26 @@ function Shell() {
         <nav className="nav">
           <div className="nav-group">
             <div className="nav-title">Work</div>
-            <NavLink to="/" end>Dashboard</NavLink>
+            <Item to="/" end>Dashboard</Item>
             <NavLink to="/inbox">
-              Inbox {pending > 0 && <span className="count">{pending}</span>}
+              <span>Inbox{hasNew("/inbox") && <NewDot />}</span> {pending > 0 && <span className="count">{pending}</span>}
             </NavLink>
-            <NavLink to="/history">History</NavLink>
+            <Item to="/history">History</Item>
           </div>
           <NavFlyout title="Observe" paths={OBSERVE}>
-            <NavLink to="/runs">Expert Task history</NavLink>
-            <NavLink to="/runners">Runners</NavLink>
-            {can("admin") && <NavLink to="/logs">Container logs</NavLink>}
-            {can("admin") && <NavLink to="/audit">Audit log</NavLink>}
+            <Item to="/runs">Expert Task history</Item>
+            <Item to="/runners">Runners</Item>
+            {can("admin") && <Item to="/logs">Container logs</Item>}
+            {can("admin") && <Item to="/audit">Audit log</Item>}
           </NavFlyout>
           {can("admin") && (
             <NavFlyout title="Configure" paths={CONFIGURE}>
-              <NavLink to="/tasks">Expert Tasks</NavLink>
-              <NavLink to="/sources">Data sources</NavLink>
-              <NavLink to="/users">Users</NavLink>
-              <NavLink to="/settings">Settings</NavLink>
+              <Item to="/tasks">Expert Tasks</Item>
+              <Item to="/sources">Data sources</Item>
+              <Item to="/automation">Automation</Item>
+              <Item to="/ai">AI assistance</Item>
+              <Item to="/updates">Updates</Item>
+              <Item to="/users">Users</Item>
             </NavFlyout>
           )}
         </nav>
@@ -166,6 +191,7 @@ function Shell() {
             Kill switch is ON: no changes are executed against the network. Proposals are still generated and can be reviewed.
           </div>
         )}
+        <NewHere />
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/inbox" element={<Review view="inbox" />} />
@@ -181,7 +207,10 @@ function Shell() {
           <Route path="/sources/:id/geoip" element={<Admin><GeoipSource /></Admin>} />
           <Route path="/audit" element={<Admin><Audit /></Admin>} />
           <Route path="/users" element={<Admin><Users /></Admin>} />
-          <Route path="/settings" element={<Admin><Settings /></Admin>} />
+          <Route path="/automation" element={<Admin><Automation /></Admin>} />
+          <Route path="/ai" element={<Admin><AiAssistance /></Admin>} />
+          <Route path="/updates" element={<Admin><Updates /></Admin>} />
+          <Route path="/settings" element={<LegacySettings />} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </main>
@@ -189,11 +218,17 @@ function Shell() {
   );
 }
 
-const CONFIGURE = ["/tasks", "/sources", "/users", "/settings"];
+const CONFIGURE = ["/tasks", "/sources", "/automation", "/ai", "/updates", "/users"];
 const OBSERVE = ["/runs", "/runners", "/logs", "/audit"];
 
 function Admin({ children }: { children: ReactNode }) {
   return useAuth().can("admin") ? <>{children}</> : <Navigate to="/" replace />;
+}
+
+/** Settings was split into Automation, AI assistance and Updates. */
+function LegacySettings() {
+  const { hash } = useLocation();
+  return <Navigate to={hash === "#updates" ? "/updates" : hash === "#ai" ? "/ai" : "/automation"} replace />;
 }
 
 /** Old /review links: open items go to the Inbox, decided ones to History. */
@@ -210,6 +245,7 @@ function NavFlyout({ title, paths, children }: { title: string; paths: string[];
   const timer = useRef<number>();
   const { pathname } = useLocation();
   const here = paths.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  const { hasNew } = useNews();
   const show = () => {
     window.clearTimeout(timer.current);
     setOpen(true);
@@ -226,7 +262,7 @@ function NavFlyout({ title, paths, children }: { title: string; paths: string[];
       onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); }}>
       <button className={`nav-parent ${here ? "active" : ""} ${open ? "open" : ""}`} aria-haspopup="true" aria-expanded={open}
         onClick={() => setOpen(!open)}>
-        {title}<span className="chev" aria-hidden>{"\u203A"}</span>
+        <span>{title}{hasNew(...paths) && <NewDot />}</span><span className="chev" aria-hidden>{"\u203A"}</span>
       </button>
       {open && (
         <div className="nav-flyout" onClick={(e) => { if ((e.target as HTMLElement).closest("a")) setOpen(false); }}>

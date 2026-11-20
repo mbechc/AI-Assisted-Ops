@@ -6,7 +6,7 @@
 #   --check                 GitHub reachability test plus release lookup
 #   --connectivity          reachability test only (Dashboard: Connected / AirGapped)
 #   --channel TRACK         switch the update track: production or development
-#   --version X.Y.Z         install that release: download, verify checksum, run its upgrade.sh
+#   --version YYYY.M.R      install that release: download, verify checksum, run its upgrade.sh
 #   --llm ACTION            Local LLM: enable (start ollama, pull the model), disable (stop, keep model)
 #                           or remove (stop and delete the model volume)
 #   --endpoints-override H  test only: probe host H instead of the GitHub endpoints
@@ -64,7 +64,7 @@ write_file() {
 
 valid_version() { [[ "$1" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[0-9A-Za-z.]+)?$ ]]; }
 
-# Semantic order: 0.2.1 > 0.2.1-dev.3 > 0.2.1-dev.2 > 0.2.0.
+# Order: 2026.11.0 > 2026.11.0-dev.3 > 2026.11.0-dev.2 > 0.2.5 (calendar versions; 0.x.y came before).
 version_gt() {
   [ "$1" = "$2" ] && return 1
   local am="${1%%-*}" bm="${2%%-*}" ap="" bp=""

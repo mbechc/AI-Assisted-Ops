@@ -59,7 +59,7 @@ export default function Dashboard() {
             24 hours ago. The graph behind each category shows the last 30 days. Click a category to review it.
           </p>
         </div>
-        {net.data && <ConnectivityChip c={net.data} onClick={can("admin") ? () => nav("/settings#updates") : undefined} />}
+        {net.data && <ConnectivityChip c={net.data} onClick={can("admin") ? () => nav("/updates") : undefined} />}
       </div>
       <ErrorLine error={kpis.error} />
       <div className="kpi-grid">

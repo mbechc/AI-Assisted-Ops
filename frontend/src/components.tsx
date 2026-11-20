@@ -1,4 +1,4 @@
-import { ReactNode, useCallback, useEffect, useRef, useState } from "react";
+import { createContext, ReactNode, useCallback, useContext, useEffect, useRef, useState } from "react";
 import { ConnectionError } from "./api";
 
 export function useAsync<T>(fn: () => Promise<T>, deps: unknown[], pollMs?: number) {
@@ -71,7 +71,7 @@ export function AiLabel({ features, mode, style }: {
   const list = Object.values(features || {});
   if (!list.length) return null;
   const title = (mode === "none"
-    ? "Runs fully on rules. With AI enabled (Settings > AI assistance) it adds:\n"
+    ? "Runs fully on rules. With AI enabled (Configure > AI assistance) it adds:\n"
     : `AI (${mode === "local" ? "local LLM" : "Azure OpenAI"}) adds:\n`) + list.map((f) => `- ${f}`).join("\n");
   return <span className={`badge ${mode === "none" ? "ai" : "ai-on"}`} style={style} title={title}>{AI_LABEL[mode]}</span>;
 }
@@ -118,7 +118,7 @@ export function ErrorLine({ error }: { error: string | null }) {
 
 /** Card that shows only its headline until opened; the page decides which card is open. */
 export function AccordionCard({ title, summary, open, onToggle, children }: {
-  title: string; summary?: ReactNode; open: boolean; onToggle: () => void; children: ReactNode;
+  title: ReactNode; summary?: ReactNode; open: boolean; onToggle: () => void; children: ReactNode;
 }) {
   return (
     <div className={`card accordion ${open ? "open" : ""}`}>
@@ -130,4 +130,22 @@ export function AccordionCard({ title, summary, open, onToggle, children }: {
       {open && <div className="accordion-body">{children}</div>}
     </div>
   );
+}
+
+const AccordionCtx = createContext<{ open: string | null; toggle: (id: string) => void } | null>(null);
+
+/** Sections inside a group open one at a time. */
+export function AccordionGroup({ initial = null, children }: { initial?: string | null; children: ReactNode }) {
+  const [open, setOpen] = useState<string | null>(initial);
+  return (
+    <AccordionCtx.Provider value={{ open, toggle: (id) => setOpen((o) => (o === id ? null : id)) }}>
+      {children}
+    </AccordionCtx.Provider>
+  );
+}
+
+export function Section({ id, title, summary, children }: { id: string; title: ReactNode; summary?: ReactNode; children: ReactNode }) {
+  const ctx = useContext(AccordionCtx);
+  if (!ctx) return <div className="card"><h2>{title}</h2>{children}</div>;
+  return <AccordionCard title={title} summary={summary} open={ctx.open === id} onToggle={() => ctx.toggle(id)}>{children}</AccordionCard>;
 }

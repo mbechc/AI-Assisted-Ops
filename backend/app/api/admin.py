@@ -13,7 +13,8 @@ from app.connectors.base import CONNECTOR_KINDS
 from app.deps import current_user, get_db, require
 from app.framework.runner import revoke_open_auto_items
 from app.llm.factory import effective_mode, get_provider
-from app.models import AuditLog, User
+from app.api.review import SAVED_KEY as SAVED_FILTERS_KEY
+from app.models import AuditLog, Setting, User
 from app.security import ROLES, hash_password
 from app.store import all_settings, get_setting, set_setting
 from app.workers import WORKERS
@@ -67,10 +68,14 @@ def patch_user(user_id: int, body: UserPatch, db: Session = Depends(get_db), adm
     if body.role is not None:
         if body.role not in ROLES:
             raise HTTPException(400, "invalid role")
+        if body.role != "admin" and _last_admin(db, u):
+            raise HTTPException(400, "the last active admin cannot lose the admin role")
         u.role, changes["role"] = body.role, body.role
     if body.is_active is not None:
         if u.id == admin.id and not body.is_active:
             raise HTTPException(400, "you cannot deactivate yourself")
+        if not body.is_active and _last_admin(db, u):
+            raise HTTPException(400, "the last active admin cannot be deactivated")
         u.is_active, changes["is_active"] = body.is_active, body.is_active
     if body.password:
         if len(body.password) < 10:
@@ -79,6 +84,33 @@ def patch_user(user_id: int, body: UserPatch, db: Session = Depends(get_db), adm
     audit(db, admin.username, "user.updated", "user", u.username, **changes)
     db.commit()
     return user_out(u)
+
+
+@router.delete("/users/{user_id}")
+def delete_user(user_id: int, db: Session = Depends(get_db), admin: User = Depends(require("admin"))):
+    """Decisions and the audit log keep the username as text, so the history stays readable."""
+    u = db.get(User, user_id)
+    if u is None:
+        raise HTTPException(404, "not found")
+    if u.id == admin.id:
+        raise HTTPException(400, "you cannot delete yourself")
+    if _last_admin(db, u):
+        raise HTTPException(400, "the last active admin cannot be deleted")
+    db.get(Setting, SAVED_FILTERS_KEY, with_for_update=True)
+    filters = get_setting(db, SAVED_FILTERS_KEY) or []
+    kept = [f for f in filters if f.get("owner") != u.username or f.get("shared")]
+    if len(kept) != len(filters):
+        set_setting(db, SAVED_FILTERS_KEY, kept)
+    db.delete(u)
+    audit(db, admin.username, "user.deleted", "user", u.username, role=u.role)
+    db.commit()
+    return {"deleted": u.username}
+
+
+def _last_admin(db: Session, u: User) -> bool:
+    if u.role != "admin" or not u.is_active:
+        return False
+    return db.scalar(select(func.count()).select_from(User).where(User.role == "admin", User.is_active.is_(True))) <= 1
 
 
 @router.get("/settings")

@@ -2,7 +2,7 @@
 # Restore a database dump created by backup.sh:  restore.sh [--no-migrate] backups/db-YYYYmmdd-HHMMSS.sql.gz
 # The matching config-*.tgz (.env with FERNET_KEY) must be in place, otherwise stored credentials cannot be decrypted.
 # --no-migrate (rollback): leave the schema as in the dump and the application stopped; then install the
-# release the dump came from (get-aiops.sh --version X.Y.Z), which migrates and starts it.
+# release the dump came from (get-aiops.sh --version YYYY.M.R), which migrates and starts it.
 set -euo pipefail
 . "$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)/lib.sh"
 require_root

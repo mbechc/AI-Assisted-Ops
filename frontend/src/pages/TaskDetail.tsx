@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useParams } from "react-router-dom";
 import { useAuth } from "../App";
 import { api, duration, fmtDate } from "../api";
-import { AiLabel, ErrorLine, Level, Status, useAsync } from "../components";
+import { AccordionGroup, AiLabel, ErrorLine, Level, Section, Status, useAsync } from "../components";
 import { CRON_PRESETS, describeCron } from "../cron";
 import { Run, Source, Task } from "../types";
 import { RunDrawer } from "./Runs";
@@ -92,9 +92,9 @@ export default function TaskDetail() {
           </button>
         ))}
       </div>
-      {tab === "config" && <Config task={t} onSaved={(nt) => { task.setData(nt); setMsg("Saved."); }} />}
+      {tab === "config" && <AccordionGroup key="config" initial="autonomy"><Config task={t} onSaved={(nt) => { task.setData(nt); setMsg("Saved."); }} /></AccordionGroup>}
       {tab === "runs" && <TaskRuns taskKey={t.key} />}
-      {tab === "calibration" && <><CalibrationView task={t} /><InsightsView task={t} /></>}
+      {tab === "calibration" && <AccordionGroup key="calibration" initial="accuracy"><CalibrationView task={t} /><InsightsView task={t} /></AccordionGroup>}
     </>
   );
 }
@@ -160,9 +160,8 @@ function Config({ task, onSaved }: { task: Task; onSaved: (t: Task) => void }) {
   };
 
   return (
-    <div className="grid cols-2">
-      <div className="card">
-        <h2>Autonomy</h2>
+    <>
+      <Section id="autonomy" title="Autonomy" summary={<span>Effective <Level level={task.autonomy.level} />, {describeCron(task.config.cron) || task.config.cron}{task.config.enabled ? "" : ", disabled"}</span>}>
         <ErrorLine error={err} />
         <h3>Autonomy cap for this task</h3>
         <p className="small muted">The cap is the highest level this task may ever run at. It applies together with the global cap (L{task.autonomy.global_cap}) and the task's built-in maximum (L{task.max_autonomy}).</p>
@@ -230,9 +229,8 @@ function Config({ task, onSaved }: { task: Task; onSaved: (t: Task) => void }) {
           </div>
         )}
         <p className="small muted">Last changed {fmtDate(task.config.updated_at)}{task.config.updated_by ? ` by ${task.config.updated_by}` : ""}. All changes are audited.</p>
-      </div>
-      <div className="card">
-        <h2>Parameters</h2>
+      </Section>
+      <Section id="params" title="Parameters" summary={<span>{task.param_specs.length} parameter{task.param_specs.length === 1 ? "" : "s"}</span>}>
         {task.param_specs.map((p) => (
           p.type === "bool" ? (
             <label key={p.key} className="check" style={{ marginBottom: 10 }} title={p.description}>
@@ -249,8 +247,8 @@ function Config({ task, onSaved }: { task: Task; onSaved: (t: Task) => void }) {
         {admin && <div className="row end"><button className="primary" onClick={() => save({ params })}>Save parameters</button></div>}
         <h3>Actions</h3>
         {Object.entries(task.action_types).map(([k, v]) => <div key={k} className="small"><code>{k}</code> {v}</div>)}
-      </div>
-    </div>
+      </Section>
+    </>
   );
 }
 
@@ -368,9 +366,9 @@ function InsightsView({ task }: { task: Task }) {
   const pct = (x: number) => `${(x * 100).toFixed(0)}%`;
   const aiOn = d.ai_mode !== "none";
   return (
-    <div className="grid cols-2" style={{ marginTop: 16 }}>
-      <div className="card">
-        <h2>Reviewer feedback (last {d.days} days)</h2>
+    <>
+      <Section id="feedback" title={`Reviewer feedback (last ${d.days} days)`}
+        summary={d.decided ? <span>{d.decided} reviewed, {pct(d.bad_rate)} rejected or overridden</span> : undefined}>
         {!d.decided ? <p className="muted">No reviewed items yet.</p> : (
           <>
             <p className="small">{d.decided} reviewed: {d.approved} approved, {d.rejected} rejected, {d.overridden} overridden ({pct(d.bad_rate)} rejected or overridden).</p>
@@ -389,9 +387,9 @@ function InsightsView({ task }: { task: Task }) {
             )}
           </>
         )}
-      </div>
-      <div className="card">
-        <h2>What reviewers say {aiOn && <span className="badge ai-on" style={{ marginLeft: 6 }}>{d.ai_mode === "local" ? "Local AI" : "Cloud AI"}</span>}</h2>
+      </Section>
+      <Section id="notes" title={<>What reviewers say {aiOn && <span className="badge ai-on" style={{ marginLeft: 6 }}>{d.ai_mode === "local" ? "Local AI" : "Cloud AI"}</span>}</>}
+        summary={d.notes.length ? <span>{d.notes.length} note{d.notes.length === 1 ? "" : "s"}</span> : undefined}>
         {d.ai ? (
           <>
             <p>{d.ai.summary}</p>
@@ -417,9 +415,9 @@ function InsightsView({ task }: { task: Task }) {
         <ErrorLine error={err} />
         {aiOn ? (
           can("admin") && !d.ai && d.decided > 0 && <button className="primary" disabled={busy} onClick={summarise}>{busy ? "Summarising..." : "Summarise with AI"}</button>
-        ) : <p className="small muted">With AI on (Settings, AI assistance), notes can be summarised into themes and suggested parameter changes.</p>}
-      </div>
-    </div>
+        ) : <p className="small muted">With AI on (Configure, AI assistance), notes can be summarised into themes and suggested parameter changes.</p>}
+      </Section>
+    </>
   );
 }
 
@@ -431,9 +429,8 @@ function CalibrationView({ task }: { task: Task }) {
   const max = Math.max(1, ...c.buckets.map((b) => b.samples + b.auto + b.open));
   const rec = c.recommendation;
   return (
-    <div className="grid cols-2">
-      <div className="card">
-        <h2>Accuracy by confidence</h2>
+    <>
+      <Section id="accuracy" title="Accuracy by confidence">
         <p className="small muted">Accuracy counts operator approvals without override and assignments made outside the platform that matched the proposal. Auto-executed items are shown separately so the statistic is not circular.</p>
         <div className="histo">
           {c.buckets.map((b) => (
@@ -449,9 +446,9 @@ function CalibrationView({ task }: { task: Task }) {
           ))}
         </div>
         <p className="small muted">Green: correct. Red: rejected or overridden. Amber: auto-executed. Grey: open.</p>
-      </div>
-      <div className="card">
-        <h2>Promotion recommendation</h2>
+      </Section>
+      <Section id="promotion" title="Promotion recommendation"
+        summary={rec ? <span>L2 at {rec.threshold} recommended</span> : <span>not enough reviews yet</span>}>
         {rec ? (
           <>
             <p>At confidence <b>{rec.threshold}</b> or higher, <b>{(rec.accuracy * 100).toFixed(1)}%</b> of {rec.samples} decided items were correct (target {(c.target_accuracy * 100).toFixed(0)}%, minimum {c.min_samples} samples).</p>
@@ -477,7 +474,7 @@ function CalibrationView({ task }: { task: Task }) {
             ))}
           </tbody>
         </table>
-      </div>
-    </div>
+      </Section>
+    </>
   );
 }

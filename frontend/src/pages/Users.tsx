@@ -1,9 +1,11 @@
 import { useState } from "react";
+import { useAuth } from "../App";
 import { api, fmtDate } from "../api";
 import { ErrorLine, Modal, useAsync } from "../components";
 import { Role, User } from "../types";
 
 export default function Users() {
+  const { user: me } = useAuth();
   const users = useAsync(() => api.get<User[]>("/users"), []);
   const [form, setForm] = useState<{ username: string; password: string; role: Role } | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -12,6 +14,17 @@ export default function Users() {
     setErr(null);
     try {
       await api.patch(`/users/${u.id}`, body);
+      users.reload();
+    } catch (e: any) {
+      setErr(e.message);
+    }
+  };
+
+  const remove = async (u: User) => {
+    if (!confirm(`Delete user "${u.username}"? Their decisions and audit entries keep the name; private saved filters are removed.`)) return;
+    setErr(null);
+    try {
+      await api.del(`/users/${u.id}`);
       users.reload();
     } catch (e: any) {
       setErr(e.message);
@@ -54,7 +67,10 @@ export default function Users() {
                 </td>
                 <td><input type="checkbox" checked={u.is_active} onChange={(e) => patch(u, { is_active: e.target.checked })} /></td>
                 <td className="small muted">{fmtDate(u.last_login)}</td>
-                <td className="num"><button onClick={() => { const p = prompt("New password (min 10 characters)"); if (p) patch(u, { password: p }); }}>Reset password</button></td>
+                <td className="num">
+                  <button onClick={() => { const p = prompt("New password (min 10 characters)"); if (p) patch(u, { password: p }); }}>Reset password</button>
+                  {u.id !== me.id && <button className="danger" style={{ marginLeft: 6 }} onClick={() => remove(u)}>Delete</button>}
+                </td>
               </tr>
             ))}
           </tbody>

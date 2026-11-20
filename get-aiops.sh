@@ -23,7 +23,7 @@ Usage: get-aiops.sh [options] [install.sh options]
 
   --dir DIR          Installation folder (default /opt/AIOps)
   --channel TRACK    production (default, stable releases) or development (also pre-releases)
-  --version X.Y.Z    Install this exact release instead of the newest on the track
+  --version YYYY.M.R Install this exact release instead of the newest on the track
   -h, --help         This help
 
 Any other option is passed to install.sh, for example --with-mock, --hostname NAME,
