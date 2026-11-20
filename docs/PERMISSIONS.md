@@ -21,12 +21,12 @@ address directly goes back to the Dashboard.
 |---|---|:-:|:-:|:-:|
 | **Work** | Dashboard | yes | yes | yes |
 | | Inbox: what needs a human now (awaiting review, open L0 findings) | yes | yes | yes |
-| | Activity: what was approved, executed, failed, rejected or superseded, by people and by automation | yes | yes | yes |
+| | History: what was approved, executed, failed, rejected or superseded, by people and by automation | yes | yes | yes |
 | **Configure** | Expert Tasks (and each task's page) | - | - | yes |
 | | Data sources (and Manage GeoIP) | - | - | yes |
 | | Users | - | - | yes |
 | | Settings (autonomy cap, kill switch, AI assistance, updates) | - | - | yes |
-| **Observe** | Run history | yes | yes | yes |
+| **Observe** | Expert Task history | yes | yes | yes |
 | | Runners | yes | yes | yes |
 | | Container logs | - | - | yes |
 | | Audit log | - | - | yes |
@@ -37,14 +37,14 @@ The whole **Configure** group is visible to admins only.
 
 | Action | Where | Viewer | Operator | Admin |
 |---|---|:-:|:-:|:-:|
-| See items, evidence, rationale and outcome | Inbox, Activity | yes | yes | yes |
-| Save personal filters; share a filter with everyone | Inbox, Activity | yes | yes | yes |
-| Delete someone else's shared filter | Inbox, Activity | - | - | yes |
+| See items, evidence, rationale and outcome | Inbox, History | yes | yes | yes |
+| Save personal filters; share a filter with everyone | Inbox, History | yes | yes | yes |
+| Delete someone else's shared filter | Inbox, History | - | - | yes |
 | Approve, approve with override, reject | Inbox | - | yes | yes |
 | Bulk approve (selected, group above threshold, all matching) | Inbox | - | yes | yes |
 | Write the AI shift summary (when AI is on) | Dashboard | - | yes | yes |
-| See run details and the run log | Run history | yes | yes | yes |
-| Follow the live container log of a run | Run history | - | - | yes |
+| See run details and the run log | Expert Task history | yes | yes | yes |
+| Follow the live container log of a run | Expert Task history | - | - | yes |
 | See workers, queues and the schedule | Runners | yes | yes | yes |
 | Run a task now | Expert Tasks | - | - | yes |
 | Change schedule, source, parameters, autonomy level and threshold | Expert Tasks | - | - | yes |
@@ -63,7 +63,7 @@ The whole **Configure** group is visible to admins only.
 ## Notes
 
 - **Autonomy.** At L2 and above a task approves items itself when the confidence is at or above its
-  threshold. Those decisions appear in **Activity** as decided by `auto`. Only admins can raise a task's
+  threshold. Those decisions appear in **History** as decided by `auto`. Only admins can raise a task's
   level, and the effective level is always the lowest of the task level, the task cap and the global cap.
   The kill switch stops all execution against the network, including approved items.
 - **Auditing.** Logins (and failed logins), every decision (manual and automatic), executions, task and

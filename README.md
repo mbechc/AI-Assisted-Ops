@@ -127,7 +127,7 @@ configure the Docker daemon proxy as well, so image pulls work.
 2. **Data sources**: add the Catalyst Center (URL, a user with network-admin or an assign-device role),
    then **Test**, which detects the release and shows which API variant each operation uses.
 3. **Expert Tasks**: press **Run** on a task (or open it to set its source and schedule), then review
-   the proposals in the **Inbox** (what needs a human now; **Activity** shows what was decided or
+   the proposals in the **Inbox** (what needs a human now; **History** shows what was decided or
    automated). Schedules are cron expressions in UTC with presets on the task page.
 4. As calibration builds up (approved vs. rejected per confidence band), raise the autonomy level. Every
    task has a cap; the global cap and the kill switch are under **Settings**. The global cap starts at
@@ -168,9 +168,9 @@ when you point at them (or click or tab to them):
 
 | Group | Pages | Who |
 |---|---|---|
-| **Work** | Dashboard, Inbox (what needs a human now), Activity (what was decided or automated) | Everyone; operators and admins decide |
+| **Work** | Dashboard, Inbox (what needs a human now), History (what was decided or automated) | Everyone; operators and admins decide |
 | **Configure** | Expert Tasks, Data sources, Users, Settings | Admins only |
-| **Observe** | Run history, Runners, Container logs, Audit log | Everyone; Container logs and Audit log admins only |
+| **Observe** | Expert Task history, Runners, Container logs, Audit log | Everyone; Container logs and Audit log admins only |
 
 Users have one of three roles: viewer (read only), operator (decides in the Inbox) and admin (everything).
 See [Roles and permissions](docs/PERMISSIONS.md) for every page and action.

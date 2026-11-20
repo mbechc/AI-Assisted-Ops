@@ -140,10 +140,10 @@ function Shell() {
             <NavLink to="/inbox">
               Inbox {pending > 0 && <span className="count">{pending}</span>}
             </NavLink>
-            <NavLink to="/activity">Activity</NavLink>
+            <NavLink to="/history">History</NavLink>
           </div>
           <NavFlyout title="Observe" paths={OBSERVE}>
-            <NavLink to="/runs">Run history</NavLink>
+            <NavLink to="/runs">Expert Task history</NavLink>
             <NavLink to="/runners">Runners</NavLink>
             {can("admin") && <NavLink to="/logs">Container logs</NavLink>}
             {can("admin") && <NavLink to="/audit">Audit log</NavLink>}
@@ -169,7 +169,8 @@ function Shell() {
         <Routes>
           <Route path="/" element={<Dashboard />} />
           <Route path="/inbox" element={<Review view="inbox" />} />
-          <Route path="/activity" element={<Review view="activity" />} />
+          <Route path="/history" element={<Review view="history" />} />
+          <Route path="/activity" element={<Navigate to="/history" replace />} />
           <Route path="/review" element={<LegacyReview />} />
           <Route path="/tasks" element={<Admin><Tasks /></Admin>} />
           <Route path="/tasks/:key" element={<Admin><TaskDetail /></Admin>} />
@@ -195,12 +196,12 @@ function Admin({ children }: { children: ReactNode }) {
   return useAuth().can("admin") ? <>{children}</> : <Navigate to="/" replace />;
 }
 
-/** Old /review links: open items go to the Inbox, decided ones to Activity. */
+/** Old /review links: open items go to the Inbox, decided ones to History. */
 function LegacyReview() {
   const { search } = useLocation();
   const statuses = new URLSearchParams(search).getAll("status").flatMap((v) => v.split(","));
   const decided = statuses.length > 0 && statuses.every((v) => v !== "proposed" && v !== "reported");
-  return <Navigate to={`/${decided ? "activity" : "inbox"}${search}`} replace />;
+  return <Navigate to={`/${decided ? "history" : "inbox"}${search}`} replace />;
 }
 
 /** Collapsed group: hovering, focusing or clicking the row opens its pages in a panel beside the sidebar. */

@@ -12,7 +12,7 @@ export default function Runs() {
   const runs = useAsync(() => api.get<{ total: number; items: Run[] }>(`/runs${qs({ limit: 50, offset })}`), [offset], 10000);
   return (
     <>
-      <div className="page-head"><div><h1>Run history</h1><p className="sub">Every scheduled or manual run of every Expert Task.</p></div></div>
+      <div className="page-head"><div><h1>Expert Task history</h1><p className="sub">Every scheduled or manual run of every Expert Task.</p></div></div>
       <ErrorLine error={runs.error} />
       <div className="card">
         <table>

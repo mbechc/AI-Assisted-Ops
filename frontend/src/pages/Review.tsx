@@ -14,8 +14,8 @@ const HEAD: Record<View, { title: string; sub: string }> = {
     title: "Inbox",
     sub: "What needs a human now: approve, override or reject what the Expert Tasks propose, and read open findings. Decisions train the confidence calibration.",
   },
-  activity: {
-    title: "Activity",
+  history: {
+    title: "History",
     sub: "What has happened: items approved, executed, failed, rejected or superseded, by people and by automation. Newest first.",
   },
 };

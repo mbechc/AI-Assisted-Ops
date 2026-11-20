@@ -13,7 +13,7 @@ x-logging: &logging
     max-file: "5"
 
 x-backend: &backend
-  image: ${AIOPS_IMAGE_PREFIX:-ghcr.io/mbechc/aiops}-backend:${AIOPS_VERSION:-0.2.5-dev.5}
+  image: ${AIOPS_IMAGE_PREFIX:-ghcr.io/mbechc/aiops}-backend:${AIOPS_VERSION:-0.2.5-dev.6}
   build:
     context: ./backend
   env_file: .env
@@ -184,7 +184,7 @@ services:
       retries: 5
 
   web:
-    image: ${AIOPS_IMAGE_PREFIX:-ghcr.io/mbechc/aiops}-web:${AIOPS_VERSION:-0.2.5-dev.5}
+    image: ${AIOPS_IMAGE_PREFIX:-ghcr.io/mbechc/aiops}-web:${AIOPS_VERSION:-0.2.5-dev.6}
     build:
       context: ./frontend
     restart: unless-stopped

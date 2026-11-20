@@ -141,7 +141,7 @@ Asynchronous operations answer *in progress* on the first poll and finish on the
 ### Do findings come back?
 
 - **Not while the mock keeps running.** Fixed items stay fixed, and declined items stay as they are in
-  **Activity**.
+  **History**.
 - **Yes after the mock container restarts** (an update, a host reboot, `docker compose restart`). The mock
   rebuilds the same estate from its seed in memory: assignments, names, roles, maintenance schedules and
   tags you changed are gone, and the next runs propose the same fixes again. This makes it easy to repeat

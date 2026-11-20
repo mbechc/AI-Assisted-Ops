@@ -203,7 +203,7 @@ def _execute_run(run_id: int) -> None:
             db.rollback()
             run = db.get(TaskRun, run_id)
             run.error = friendly_error(exc)
-            ctx.log(f"FAILED: {run.error} (admins: technical details in Run history > Live container log)")
+            ctx.log(f"FAILED: {run.error} (admins: technical details in Expert Task history > Live container log)")
             run.status = "failed"
         finally:
             try:

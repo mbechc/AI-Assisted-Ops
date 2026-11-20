@@ -1,4 +1,4 @@
-// Inbox and Activity filters: what can be filtered, and how filters map to the URL and to the API.
+// Inbox and History filters: what can be filtered, and how filters map to the URL and to the API.
 // The URL is the source of truth, so filtered views can be bookmarked, shared and saved.
 
 export type Attr = "source" | "task" | "status" | "group" | "target" | "confidence" | "blocked";
@@ -53,15 +53,15 @@ export const STATUS_LABELS: Record<string, string> = {
   done: "Done", failed: "Failed", rejected: "Rejected", superseded: "Superseded",
 };
 
-export type View = "inbox" | "activity";
+export type View = "inbox" | "history";
 
-/** Statuses each view shows: the Inbox holds open items, Activity what has been decided or automated. */
+/** Statuses each view shows: the Inbox holds open items, History what has been decided or automated. */
 export const SCOPE: Record<View, string[]> = {
   inbox: ["proposed", "reported"],
-  activity: ["approved", "executing", "done", "failed", "rejected", "superseded"],
+  history: ["approved", "executing", "done", "failed", "rejected", "superseded"],
 };
 
-const DEFAULT: Record<View, Filter[]> = { inbox: [{ attr: "status", op: "is", values: ["proposed"] }], activity: [] };
+const DEFAULT: Record<View, Filter[]> = { inbox: [{ attr: "status", op: "is", values: ["proposed"] }], history: [] };
 const ALL_KEY = "all";
 
 export function opDef(attr: Attr, op: string): OpDef {

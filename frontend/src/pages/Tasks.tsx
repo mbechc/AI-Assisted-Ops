@@ -42,7 +42,7 @@ export default function Tasks() {
           </p>
         </div>
       </div>
-      {msg && <div className="banner info">{msg} <Link to="/runs">Run history</Link></div>}
+      {msg && <div className="banner info">{msg} <Link to="/runs">Expert Task history</Link></div>}
       <ErrorLine error={err || error} />
       {Object.entries(byCat).map(([cat, tasks]) => (
         <div className="card" key={cat}>
