@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../App";
 import { api, fmtDate } from "../api";
-import { AiLabel, ErrorLine, Level, Status, useAsync } from "../components";
+import { AccordionCard, AiLabel, ErrorLine, Level, Status, useAsync } from "../components";
 import { describeCron } from "../cron";
 import { Run, Task } from "../types";
 
@@ -12,6 +12,7 @@ export default function Tasks() {
   const [starting, setStarting] = useState<string | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
+  const [openCat, setOpenCat] = useState<string | null>(null);
   const byCat: Record<string, Task[]> = {};
   (data || []).forEach((t) => (byCat[t.category] ||= []).push(t));
 
@@ -45,8 +46,8 @@ export default function Tasks() {
       {msg && <div className="banner info">{msg} <Link to="/runs">Expert Task history</Link></div>}
       <ErrorLine error={err || error} />
       {Object.entries(byCat).map(([cat, tasks]) => (
-        <div className="card" key={cat}>
-          <h2>{cat}</h2>
+        <AccordionCard key={cat} title={cat} summary={<CategorySummary tasks={tasks} />} open={openCat === cat}
+          onToggle={() => setOpenCat(openCat === cat ? null : cat)}>
           <table>
             <thead>
               <tr><th>Task</th><th>Schedule</th><th>Autonomy (effective / cap)</th><th className="num">Review</th><th className="num">Done</th><th>Last run</th><th>Next run</th>{can("admin") && <th />}</tr>
@@ -87,8 +88,22 @@ export default function Tasks() {
               })}
             </tbody>
           </table>
-        </div>
+        </AccordionCard>
       ))}
+    </>
+  );
+}
+
+function CategorySummary({ tasks }: { tasks: Task[] }) {
+  const review = tasks.reduce((n, t) => n + (t.counts.proposed || 0), 0);
+  const failed = tasks.filter((t) => t.last_run?.status === "failed").length;
+  const running = tasks.filter((t) => t.last_run?.status === "queued" || t.last_run?.status === "running").length;
+  return (
+    <>
+      <span>{tasks.length} task{tasks.length === 1 ? "" : "s"}</span>
+      {review > 0 && <span>{review} awaiting review</span>}
+      {running > 0 && <span>{running} running</span>}
+      {failed > 0 && <span className="err">{failed} last run failed</span>}
     </>
   );
 }

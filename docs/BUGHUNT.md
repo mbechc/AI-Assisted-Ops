@@ -14,7 +14,7 @@ Status: **open**, **fixed in X.Y.Z** or **won't fix**.
 | 5 | Workers | worker-inventory restarted on 19 Nov 16:22 while a run was active (run marked failed as orphaned); cause unknown | open, needs info |
 | 6 | UI | Sidebar subtitle "Catalyst Center operations assistant" should read "IT Operations Assistant": AIOps will cover more products than Catalyst Center | fixed in 0.2.5-dev.7 |
 | 7 | Inbox | The "By group" table looks cluttered: remove the ">= Threshold" and "Need choice" columns and the per-group Approve button | fixed in 0.2.5-dev.7 |
-| 8 | Expert Tasks | The category cards (Collector, Wireless / Inventory hygiene, ...) are always fully open, which makes the page hard to overview: collapse them to their headline and expand one at a time | open |
+| 8 | Expert Tasks | The category cards (Collector, Wireless / Inventory hygiene, ...) are always fully open, which makes the page hard to overview: collapse them to their headline and expand one at a time | fixed in 0.2.5-dev.8 |
 
 ## Notes
 

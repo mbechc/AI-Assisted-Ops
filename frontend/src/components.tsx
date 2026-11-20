@@ -115,3 +115,19 @@ export function Pager({ total, limit, offset, onChange }: { total: number; limit
 export function ErrorLine({ error }: { error: string | null }) {
   return error ? <div className="banner bad">{error}</div> : null;
 }
+
+/** Card that shows only its headline until opened; the page decides which card is open. */
+export function AccordionCard({ title, summary, open, onToggle, children }: {
+  title: string; summary?: ReactNode; open: boolean; onToggle: () => void; children: ReactNode;
+}) {
+  return (
+    <div className={`card accordion ${open ? "open" : ""}`}>
+      <button className="accordion-head" aria-expanded={open} onClick={onToggle}>
+        <span className="chev" aria-hidden>{open ? "\u25BE" : "\u25B8"}</span>
+        <h2>{title}</h2>
+        {summary && <span className="accordion-sum">{summary}</span>}
+      </button>
+      {open && <div className="accordion-body">{children}</div>}
+    </div>
+  );
+}
