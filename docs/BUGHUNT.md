@@ -12,6 +12,7 @@ Status: **open**, **fixed in X.Y.Z** or **won't fix**.
 | 3 | Wrong-site detection | Run 27 failed with a database error: two tasks wrote the same cache entry at the same time (`duplicate key ... cache_entries_pkey`) | fixed in 0.2.5-dev.4 |
 | 4 | Installer | Redis warns at every start that memory overcommit is disabled (`vm.overcommit_memory`) | fixed in 0.2.5-dev.4 |
 | 5 | Workers | worker-inventory restarted on 19 Nov 16:22 while a run was active (run marked failed as orphaned); cause unknown | open, needs info |
+| 6 | UI | Sidebar subtitle "Catalyst Center operations assistant" should read "IT Operations Assistant": AIOps will cover more products than Catalyst Center | open |
 
 ## Notes
 
@@ -70,6 +71,12 @@ failed (`marked 1 orphaned run(s)`). That is the intended recovery; the open que
 restarted. If nobody restarted or updated the appliance at that time, check for an out-of-memory kill:
 `docker inspect aiops-worker-inventory-1 --format '{{.State.OOMKilled}} {{.RestartCount}}'` and
 `journalctl -k | grep -i oom`.
+
+### 6. Sidebar subtitle
+
+The subtitle under the AIOps logo (`frontend/src/App.tsx`, the `brand` block) says "Catalyst Center operations
+assistant". Rename it to "IT Operations Assistant", since later releases will support more products than
+Catalyst Center. It is the only place the text appears.
 
 ### Not bugs (checked)
 
