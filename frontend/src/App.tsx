@@ -134,27 +134,28 @@ function Shell() {
           <small>Catalyst Center operations assistant</small>
         </div>
         <nav className="nav">
-          <NavGroup id="work" title="Work">
+          <div className="nav-group">
+            <div className="nav-title">Work</div>
             <NavLink to="/" end>Dashboard</NavLink>
             <NavLink to="/inbox">
               Inbox {pending > 0 && <span className="count">{pending}</span>}
             </NavLink>
             <NavLink to="/activity">Activity</NavLink>
-          </NavGroup>
-          {can("admin") && (
-            <NavGroup id="configure" title="Configure" collapsible paths={CONFIGURE}>
-              <NavLink to="/tasks">Expert Tasks</NavLink>
-              <NavLink to="/sources">Data sources</NavLink>
-              <NavLink to="/users">Users</NavLink>
-              <NavLink to="/settings">Settings</NavLink>
-            </NavGroup>
-          )}
-          <NavGroup id="observe" title="Observe" collapsible paths={OBSERVE}>
+          </div>
+          <NavFlyout title="Observe" paths={OBSERVE}>
             <NavLink to="/runs">Run history</NavLink>
             <NavLink to="/runners">Runners</NavLink>
             {can("admin") && <NavLink to="/logs">Container logs</NavLink>}
             {can("admin") && <NavLink to="/audit">Audit log</NavLink>}
-          </NavGroup>
+          </NavFlyout>
+          {can("admin") && (
+            <NavFlyout title="Configure" paths={CONFIGURE}>
+              <NavLink to="/tasks">Expert Tasks</NavLink>
+              <NavLink to="/sources">Data sources</NavLink>
+              <NavLink to="/users">Users</NavLink>
+              <NavLink to="/settings">Settings</NavLink>
+            </NavFlyout>
+          )}
         </nav>
         <UserMenu />
       </aside>
@@ -202,29 +203,36 @@ function LegacyReview() {
   return <Navigate to={`/${decided ? "activity" : "inbox"}${search}`} replace />;
 }
 
-function NavGroup({ id, title, collapsible, paths = [], children }: {
-  id: string; title: string; collapsible?: boolean; paths?: string[]; children: ReactNode;
-}) {
-  const key = `aiops.nav.${id}`;
-  const [open, setOpen] = useState(() => localStorage.getItem(key) !== "closed");
+/** Collapsed group: hovering, focusing or clicking the row opens its pages in a panel beside the sidebar. */
+function NavFlyout({ title, paths, children }: { title: string; paths: string[]; children: ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const timer = useRef<number>();
   const { pathname } = useLocation();
   const here = paths.some((p) => pathname === p || pathname.startsWith(`${p}/`));
-  useEffect(() => {
-    if (here) setOpen(true);
-  }, [here]);
-  const toggle = () => {
-    localStorage.setItem(key, open ? "closed" : "open");
-    setOpen(!open);
+  const show = () => {
+    window.clearTimeout(timer.current);
+    setOpen(true);
   };
-  const shown = !collapsible || open;
+  const hide = () => {
+    window.clearTimeout(timer.current);
+    timer.current = window.setTimeout(() => setOpen(false), 150);
+  };
+  useEffect(() => setOpen(false), [pathname]);
+  useEffect(() => () => window.clearTimeout(timer.current), []);
   return (
-    <div className="nav-group">
-      {collapsible ? (
-        <button className="nav-title" aria-expanded={shown} onClick={toggle}>
-          {title}<span className="chev" aria-hidden>{shown ? "\u25BE" : "\u25B8"}</span>
-        </button>
-      ) : <div className="nav-title">{title}</div>}
-      {shown && children}
+    <div className="nav-flyout-wrap" onMouseEnter={show} onMouseLeave={hide}
+      onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) hide(); }}
+      onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); }}>
+      <button className={`nav-parent ${here ? "active" : ""} ${open ? "open" : ""}`} aria-haspopup="true" aria-expanded={open}
+        onClick={() => setOpen(!open)}>
+        {title}<span className="chev" aria-hidden>{"\u203A"}</span>
+      </button>
+      {open && (
+        <div className="nav-flyout" onClick={(e) => { if ((e.target as HTMLElement).closest("a")) setOpen(false); }}>
+          <div className="nav-flyout-head">{title}</div>
+          {children}
+        </div>
+      )}
     </div>
   );
 }

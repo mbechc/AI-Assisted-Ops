@@ -163,7 +163,8 @@ task run uses the new mode.
 
 ### Menu and roles
 
-The sidebar has three groups:
+The sidebar has three groups. Work is always open; Observe and Configure show their pages in a panel
+when you point at them (or click or tab to them):
 
 | Group | Pages | Who |
 |---|---|---|
