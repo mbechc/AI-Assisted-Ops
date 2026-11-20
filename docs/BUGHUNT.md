@@ -14,6 +14,7 @@ Status: **open**, **fixed in X.Y.Z** or **won't fix**.
 | 5 | Workers | worker-inventory restarted on 19 Nov 16:22 while a run was active (run marked failed as orphaned); cause unknown | open, needs info |
 | 6 | UI | Sidebar subtitle "Catalyst Center operations assistant" should read "IT Operations Assistant": AIOps will cover more products than Catalyst Center | fixed in 0.2.5-dev.7 |
 | 7 | Inbox | The "By group" table looks cluttered: remove the ">= Threshold" and "Need choice" columns and the per-group Approve button | fixed in 0.2.5-dev.7 |
+| 8 | Expert Tasks | The category cards (Collector, Wireless / Inventory hygiene, ...) are always fully open, which makes the page hard to overview: collapse them to their headline and expand one at a time | open |
 
 ## Notes
 
@@ -90,6 +91,22 @@ The group table in the Inbox (`GroupsView` in `frontend/src/pages/Review.tsx`) h
 Without the button, the "Bulk approve threshold" box above the table has no purpose and goes as well. The
 table keeps Group, Task, Catalyst Center, Items and Avg conf.; clicking a row still opens the group's items.
 Bulk decisions stay available in the **Items** tab (Approve selected, Reject selected, Approve all matching).
+
+### 8. Expert Tasks: collapsible category cards
+
+**Configure → Expert Tasks** (`frontend/src/pages/Tasks.tsx`) shows one card per category, such as
+*Collector* or *Wireless / Inventory hygiene*, each with its full task table. With every card open the page
+is long and hard to overview.
+
+Wanted (accordion):
+
+- Every card starts collapsed and shows only its headline (the category name). A short summary on the
+  headline, such as the number of tasks and items awaiting review, would help when collapsed.
+- Clicking a headline expands that card.
+- Only one card is open at a time: expanding another card (for example *Collector*) closes the one that was
+  open. Clicking the open card's headline closes it.
+
+Possible follow-up: use the same pattern for other pages built from cards.
 
 ### Not bugs (checked)
 
