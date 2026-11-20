@@ -1,7 +1,7 @@
 {
   "name": "aiops-web",
   "private": true,
-  "version": "2026.11.0-dev.1",
+  "version": "2026.11.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
