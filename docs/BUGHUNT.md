@@ -13,6 +13,7 @@ Status: **open**, **fixed in X.Y.Z** or **won't fix**.
 | 4 | Installer | Redis warns at every start that memory overcommit is disabled (`vm.overcommit_memory`) | fixed in 0.2.5-dev.4 |
 | 5 | Workers | worker-inventory restarted on 19 Nov 16:22 while a run was active (run marked failed as orphaned); cause unknown | open, needs info |
 | 6 | UI | Sidebar subtitle "Catalyst Center operations assistant" should read "IT Operations Assistant": AIOps will cover more products than Catalyst Center | open |
+| 7 | Inbox | The "By group" table looks cluttered: remove the ">= Threshold" and "Need choice" columns and the per-group Approve button | open |
 
 ## Notes
 
@@ -77,6 +78,18 @@ restarted. If nobody restarted or updated the appliance at that time, check for 
 The subtitle under the AIOps logo (`frontend/src/App.tsx`, the `brand` block) says "Catalyst Center operations
 assistant". Rename it to "IT Operations Assistant", since later releases will support more products than
 Catalyst Center. It is the only place the text appears.
+
+### 7. Inbox "By group" table is cluttered
+
+The group table in the Inbox (`GroupsView` in `frontend/src/pages/Review.tsx`) has too much on each row. Remove:
+
+- the **>= Threshold** column,
+- the **Need choice** column,
+- the per-group **Approve >= N** button.
+
+Without the button, the "Bulk approve threshold" box above the table has no purpose and goes as well. The
+table keeps Group, Task, Catalyst Center, Items and Avg conf.; clicking a row still opens the group's items.
+Bulk decisions stay available in the **Items** tab (Approve selected, Reject selected, Approve all matching).
 
 ### Not bugs (checked)
 
