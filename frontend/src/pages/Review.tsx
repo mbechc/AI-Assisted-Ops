@@ -101,15 +101,6 @@ export default function Review({ view: scope }: { view: View }) {
         <GroupsView
           groups={groups.data?.groups || null} taskName={taskName} sourceName={sourceName} showSource={sourceCount > 1}
           onOpen={openGroup}
-          onBulk={(g, min) => decide({
-            decision: "approve",
-            filter: {
-              ...filtersToDecide(filters, q), task_key: [g.task_key], task_key_not: [],
-              source_id: g.source_id === null ? [] : [g.source_id], source_id_not: [],
-              group: g.group === null ? [] : [g.group], group_not: [], group_contains: null,
-              min_confidence: Math.max(min, Number(apiParams.min_confidence ?? 0)),
-            },
-          }, `Approved ${g.group ?? "group"} >= ${min}`)}
         />
       ) : (
         <div className="card">
@@ -138,34 +129,19 @@ export default function Review({ view: scope }: { view: View }) {
   );
 }
 
-function GroupsView({ groups, taskName, sourceName, showSource, onOpen, onBulk }: {
+function GroupsView({ groups, taskName, sourceName, showSource, onOpen }: {
   groups: Group[] | null; taskName: (k: string) => string; sourceName: (id: number | null) => string; showSource: boolean;
-  onOpen: (g: Group) => void; onBulk: (g: Group, min: number) => void;
+  onOpen: (g: Group) => void;
 }) {
-  const { can } = useAuth();
-  const [min, setMin] = useState("");
   if (!groups) return null;
   const showTask = new Set(groups.map((g) => g.task_key)).size > 1;
-  const canBulk = can("operator");
-  const thr = (g: Group) => (min === "" ? g.threshold : Number(min));
   return (
     <div className="card">
-      {canBulk && (
-        <div className="row" style={{ marginBottom: 10 }}>
-          <span className="muted small">Bulk approve threshold</span>
-          <input type="number" min={0} max={100} style={{ width: 90 }} placeholder="per task" value={min}
-            onChange={(e) => setMin(e.target.value)} />
-          <span className="muted small">
-            Empty uses each task's auto threshold. Only items awaiting review are approved; items needing a manual choice never are.
-          </span>
-        </div>
-      )}
       <table>
         <thead>
           <tr>
             <th>Group</th>{showTask && <th>Task</th>}{showSource && <th>Catalyst Center</th>}
             <th className="num">Items</th><th className="num">Avg conf.</th>
-            <th className="num">&gt;= threshold</th><th className="num">Need choice</th><th />
           </tr>
         </thead>
         <tbody>
@@ -176,18 +152,9 @@ function GroupsView({ groups, taskName, sourceName, showSource, onOpen, onBulk }
               {showSource && <td className="small">{sourceName(g.source_id)}</td>}
               <td className="num">{g.count}</td>
               <td className="num"><Confidence value={Math.round(g.avg_confidence)} small /></td>
-              <td className="num">{g.above_threshold}</td>
-              <td className="num">{g.blocked || ""}</td>
-              <td className="num" onClick={(e) => e.stopPropagation()}>
-                {canBulk && (
-                  <button className="ok" onClick={() => {
-                    if (confirm(`Approve all items awaiting review in "${g.group ?? "none"}" (${taskName(g.task_key)}) with confidence >= ${thr(g)}?`)) onBulk(g, thr(g));
-                  }}>Approve &gt;= {thr(g)}</button>
-                )}
-              </td>
             </tr>
           ))}
-          {!groups.length && <tr><td colSpan={8} className="muted">Nothing matches the filters.</td></tr>}
+          {!groups.length && <tr><td colSpan={5} className="muted">Nothing matches the filters.</td></tr>}
         </tbody>
       </table>
     </div>

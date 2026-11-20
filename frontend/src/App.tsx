@@ -131,7 +131,7 @@ function Shell() {
       <aside className="sidebar">
         <div className="brand">
           AIOps
-          <small>Catalyst Center operations assistant</small>
+          <small>IT Operations Assistant</small>
         </div>
         <nav className="nav">
           <div className="nav-group">

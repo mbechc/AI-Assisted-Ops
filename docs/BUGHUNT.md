@@ -12,8 +12,8 @@ Status: **open**, **fixed in X.Y.Z** or **won't fix**.
 | 3 | Wrong-site detection | Run 27 failed with a database error: two tasks wrote the same cache entry at the same time (`duplicate key ... cache_entries_pkey`) | fixed in 0.2.5-dev.4 |
 | 4 | Installer | Redis warns at every start that memory overcommit is disabled (`vm.overcommit_memory`) | fixed in 0.2.5-dev.4 |
 | 5 | Workers | worker-inventory restarted on 19 Nov 16:22 while a run was active (run marked failed as orphaned); cause unknown | open, needs info |
-| 6 | UI | Sidebar subtitle "Catalyst Center operations assistant" should read "IT Operations Assistant": AIOps will cover more products than Catalyst Center | open |
-| 7 | Inbox | The "By group" table looks cluttered: remove the ">= Threshold" and "Need choice" columns and the per-group Approve button | open |
+| 6 | UI | Sidebar subtitle "Catalyst Center operations assistant" should read "IT Operations Assistant": AIOps will cover more products than Catalyst Center | fixed in 0.2.5-dev.7 |
+| 7 | Inbox | The "By group" table looks cluttered: remove the ">= Threshold" and "Need choice" columns and the per-group Approve button | fixed in 0.2.5-dev.7 |
 
 ## Notes
 

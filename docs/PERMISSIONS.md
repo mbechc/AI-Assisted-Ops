@@ -41,7 +41,7 @@ The whole **Configure** group is visible to admins only.
 | Save personal filters; share a filter with everyone | Inbox, History | yes | yes | yes |
 | Delete someone else's shared filter | Inbox, History | - | - | yes |
 | Approve, approve with override, reject | Inbox | - | yes | yes |
-| Bulk approve (selected, group above threshold, all matching) | Inbox | - | yes | yes |
+| Bulk approve or reject (selected items, all matching) | Inbox, Items tab | - | yes | yes |
 | Write the AI shift summary (when AI is on) | Dashboard | - | yes | yes |
 | See run details and the run log | Expert Task history | yes | yes | yes |
 | Follow the live container log of a run | Expert Task history | - | - | yes |
