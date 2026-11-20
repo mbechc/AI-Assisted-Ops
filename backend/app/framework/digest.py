@@ -14,6 +14,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.framework import registry
+from app.framework.runner import display_error
 from app.llm.base import LLMProvider, LLMUnavailable
 from app.models import TaskRun, WorkItem
 from app.store import cache_get, cache_set
@@ -71,7 +72,7 @@ def shift_facts(db: Session, hours: int = 12) -> dict:
                 c["rejected"] += 1
             elif status == "superseded" and not (outcome or {}).get("removed_from_inventory"):
                 c["resolved_outside"] += 1
-    failed_runs = [{"task": names.get(r.task_key, r.task_key), "run_id": r.id, "error": (r.error or "")[:200]}
+    failed_runs = [{"task": names.get(r.task_key, r.task_key), "run_id": r.id, "error": (display_error(r.error) or "")[:200]}
                    for r in db.scalars(select(TaskRun).where(TaskRun.status == "failed", TaskRun.created_at >= since)
                                        .order_by(TaskRun.id.desc()).limit(10))]
     tasks = []

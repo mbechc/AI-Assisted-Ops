@@ -25,14 +25,14 @@ export default function Login({ onLogin }: { onLogin: (u: User) => void }) {
     <div className="login card">
       <h1>AIOps</h1>
       <p className="sub" style={{ marginBottom: 16 }}>Sign in to review and automate operational tasks.</p>
-      <form onSubmit={submit}>
+      <form method="post" action="/login" onSubmit={submit}>
         <label className="field">
           Username
-          <input autoFocus value={username} onChange={(e) => setUsername(e.target.value)} />
+          <input id="username" name="username" autoComplete="username" autoCapitalize="none" spellCheck={false} autoFocus value={username} onChange={(e) => setUsername(e.target.value)} />
         </label>
         <label className="field">
           Password
-          <input type="password" value={password} onChange={(e) => setPassword(e.target.value)} />
+          <input id="password" name="password" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
         </label>
         {error && <p className="err">{error}</p>}
         <button className="primary" disabled={busy || !username || !password} type="submit">Sign in</button>

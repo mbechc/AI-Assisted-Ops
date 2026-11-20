@@ -1,4 +1,4 @@
-// Review queue filters: what can be filtered, and how filters map to the URL and to the API.
+// Inbox and Activity filters: what can be filtered, and how filters map to the URL and to the API.
 // The URL is the source of truth, so filtered views can be bookmarked, shared and saved.
 
 export type Attr = "source" | "task" | "status" | "group" | "target" | "confidence" | "blocked";
@@ -53,7 +53,15 @@ export const STATUS_LABELS: Record<string, string> = {
   done: "Done", failed: "Failed", rejected: "Rejected", superseded: "Superseded",
 };
 
-const DEFAULT: Filter[] = [{ attr: "status", op: "is", values: ["proposed"] }];
+export type View = "inbox" | "activity";
+
+/** Statuses each view shows: the Inbox holds open items, Activity what has been decided or automated. */
+export const SCOPE: Record<View, string[]> = {
+  inbox: ["proposed", "reported"],
+  activity: ["approved", "executing", "done", "failed", "rejected", "superseded"],
+};
+
+const DEFAULT: Record<View, Filter[]> = { inbox: [{ attr: "status", op: "is", values: ["proposed"] }], activity: [] };
 const ALL_KEY = "all";
 
 export function opDef(attr: Attr, op: string): OpDef {
@@ -66,17 +74,18 @@ export function attrLabel(attr: Attr): string {
 
 const isMulti = (kind: ValueKind) => kind === "multi";
 
-/** Filters from the URL; a URL without any filter shows what awaits review. */
-export function parseFilters(sp: URLSearchParams): Filter[] {
+/** Filters from the URL, limited to the view's statuses; a URL without any filter shows the view's default. */
+export function parseFilters(sp: URLSearchParams, view: View): Filter[] {
   const out: Filter[] = [];
   for (const a of ATTRS) {
     for (const o of a.ops) {
-      const raw = sp.getAll(o.urlKey).flatMap((v) => (a.attr === "status" ? v.split(",") : [v])).filter(Boolean);
+      const raw = sp.getAll(o.urlKey).flatMap((v) => (a.attr === "status" ? v.split(",") : [v])).filter(Boolean)
+        .filter((v) => a.attr !== "status" || SCOPE[view].includes(v));
       if (!raw.length) continue;
       out.push({ attr: a.attr, op: o.op, values: isMulti(o.kind) ? [...new Set(raw)] : [raw[raw.length - 1]] });
     }
   }
-  if (!out.length && !sp.has(ALL_KEY) && !sp.get("q")) return DEFAULT;
+  if (!out.length && !sp.has(ALL_KEY) && !sp.get("q")) return DEFAULT[view];
   return out;
 }
 
@@ -90,7 +99,7 @@ export function filtersToQuery(filters: Filter[], q: string): string {
 }
 
 /** Parameters for GET /items, /items/groups and /review/facets. */
-export function filtersToApi(filters: Filter[], q: string): Record<string, string | string[]> {
+export function filtersToApi(filters: Filter[], q: string, view: View): Record<string, string | string[]> {
   const out: Record<string, string | string[]> = {};
   filters.forEach((f) => {
     const d = opDef(f.attr, f.op);
@@ -98,13 +107,14 @@ export function filtersToApi(filters: Filter[], q: string): Record<string, strin
     else if (d.kind === "yesno") out[d.apiKey] = f.values[0] === "yes" ? "true" : "false";
     else out[d.apiKey] = f.values[0];
   });
+  if (!out.status) out.status = SCOPE[view];
   if (q) out.q = q;
   return out;
 }
 
 /** Body filter for POST /items/decide (the server limits bulk decisions to items awaiting review). */
 export function filtersToDecide(filters: Filter[], q: string): Record<string, unknown> {
-  const api = filtersToApi(filters, q);
+  const api = filtersToApi(filters, q, "inbox");
   const body: Record<string, unknown> = {};
   Object.entries(api).forEach(([k, v]) => {
     if (k === "source_id" || k === "source_id_not") body[k] = (v as string[]).map(Number);

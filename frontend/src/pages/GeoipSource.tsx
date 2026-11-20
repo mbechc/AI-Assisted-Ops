@@ -152,7 +152,7 @@ export default function GeoipSource() {
                 <td className="small">{k.top_buildings.map((b) => `${b.site.split("/").slice(-2).join("/")} (${b.devices})`).join(", ") || "-"}</td>
                 <td className="small">{k.learned_site ? <>{k.learned_site.split("/").slice(-2).join("/")} <span className="muted">({Math.round((k.purity || 0) * 100)}%)</span></> : <span className="muted">not learned</span>}</td>
                 <td>
-                  {can("operator") ? (
+                  {can("admin") ? (
                     <select value={k.mapped_site_id || ""} onChange={(e) => act(async () => {
                       const m = s?.mappings.find((x) => x.location_key === k.location_key);
                       if (e.target.value) await api.put(`/sources/${sid}/geoip/mappings`, { location_key: k.location_key, site_id: e.target.value, cc_source_id: ccId });

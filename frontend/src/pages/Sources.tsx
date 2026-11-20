@@ -88,7 +88,7 @@ export default function Sources() {
                     {s.kind === "geoip"
                       ? <Link to={`/sources/${s.id}/geoip`}><button>Manage GeoIP</button></Link>
                       : <button onClick={() => showCaps(s)}>Capabilities</button>}
-                    {can("operator") && <button onClick={() => runTest(s)} disabled={test?.busy}>{test?.busy && test.id === s.id ? "Testing..." : "Test"}</button>}
+                    {can("admin") && <button onClick={() => runTest(s)} disabled={test?.busy}>{test?.busy && test.id === s.id ? "Testing..." : "Test"}</button>}
                     {can("admin") && <button onClick={() => setEdit({ ...EMPTY, ...s, password: "", ca_bundle: "" })}>Edit</button>}
                     {can("admin") && <button className="danger" onClick={() => remove(s)}>Delete</button>}
                   </div>
@@ -126,8 +126,8 @@ export default function Sources() {
             <>
               <label className="field">Base URL<input value={edit.base_url} onChange={(e) => setEdit({ ...edit, base_url: e.target.value })} /></label>
               <div className="grid cols-2">
-                <label className="field">Username<input value={edit.username} onChange={(e) => setEdit({ ...edit, username: e.target.value })} /></label>
-                <label className="field">Password{edit.id ? " (leave empty to keep)" : ""}<input type="password" value={edit.password} onChange={(e) => setEdit({ ...edit, password: e.target.value })} /></label>
+                <label className="field">Username<input autoComplete="off" value={edit.username} onChange={(e) => setEdit({ ...edit, username: e.target.value })} /></label>
+                <label className="field">Password{edit.id ? " (leave empty to keep)" : ""}<input type="password" autoComplete="new-password" value={edit.password} onChange={(e) => setEdit({ ...edit, password: e.target.value })} /></label>
               </div>
               <label className="field">API rate limit (requests/second)<input type="number" value={edit.rate_limit_rps} onChange={(e) => setEdit({ ...edit, rate_limit_rps: Number(e.target.value) })} /></label>
               <label className="check"><input type="checkbox" checked={edit.verify_tls} onChange={(e) => setEdit({ ...edit, verify_tls: e.target.checked })} /> Verify TLS certificate</label>

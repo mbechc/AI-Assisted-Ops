@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from sqlalchemy.orm import Session
+from sqlalchemy.orm.util import identity_key
 
 from app.models import CacheEntry, Setting
 
@@ -48,11 +49,18 @@ def cache_get(db: Session, key: str) -> Any | None:
 
 
 def cache_set(db: Session, key: str, value: Any, ttl_seconds: int) -> None:
+    """Insert or replace in one statement: tasks on other workers may write the same key concurrently."""
     expires = datetime.now(timezone.utc) + timedelta(seconds=ttl_seconds)
-    row = db.get(CacheEntry, key)
-    if row is None:
-        db.add(CacheEntry(key=key, value=value, expires_at=expires))
+    dialect = db.get_bind().dialect.name
+    if dialect == "postgresql":
+        from sqlalchemy.dialects.postgresql import insert
+    elif dialect == "sqlite":
+        from sqlalchemy.dialects.sqlite import insert
     else:
-        row.value = value
-        row.expires_at = expires
-    db.flush()
+        raise RuntimeError(f"unsupported database {dialect}")
+    stmt = insert(CacheEntry).values(key=key, value=value, expires_at=expires)
+    db.execute(stmt.on_conflict_do_update(index_elements=[CacheEntry.key],
+                                          set_={"value": stmt.excluded.value, "expires_at": stmt.excluded.expires_at}))
+    cached = db.identity_map.get(identity_key(CacheEntry, key))
+    if cached is not None:
+        db.expire(cached)

@@ -16,7 +16,7 @@ from app.framework.autonomy import effective_autonomy
 from app.framework.base import LEVEL_NAMES
 from app.framework.calibration import calibration
 from app.framework.insights import ai_summary, cached_ai_summary, insights
-from app.framework.runner import RunAlreadyActive, create_run, decide, ensure_task_configs
+from app.framework.runner import RunAlreadyActive, create_run, decide, display_error, ensure_task_configs
 from app.item_filter import ItemFilter, apply, item_filter
 from app.llm.base import LLMUnavailable
 from app.llm.factory import effective_mode, get_provider
@@ -48,7 +48,8 @@ class DecisionIn(BaseModel):
 def run_out(r: TaskRun, with_log: bool = False) -> dict:
     d = {"id": r.id, "task_key": r.task_key, "source_id": r.source_id, "trigger": r.trigger,
          "triggered_by": r.triggered_by, "status": r.status, "started_at": r.started_at,
-         "finished_at": r.finished_at, "created_at": r.created_at, "stats": r.stats, "error": r.error}
+         "finished_at": r.finished_at, "created_at": r.created_at, "stats": r.stats,
+         "error": display_error(r.error)}
     if with_log:
         d["log"] = r.log
     return d
@@ -204,7 +205,7 @@ def update_task(key: str, body: TaskConfigIn, db: Session = Depends(get_db), adm
 
 
 @router.post("/tasks/{key}/run")
-def trigger_run(key: str, db: Session = Depends(get_db), user: User = Depends(require("operator"))):
+def trigger_run(key: str, db: Session = Depends(get_db), user: User = Depends(require("admin"))):
     try:
         run = create_run(db, key, "manual", user.username)
     except KeyError:
@@ -236,7 +237,7 @@ def task_insights(key: str, db: Session = Depends(get_db), _=Depends(current_use
 
 
 @router.post("/tasks/{key}/insights/ai")
-def task_insights_ai(key: str, db: Session = Depends(get_db), user: User = Depends(require("operator"))):
+def task_insights_ai(key: str, db: Session = Depends(get_db), user: User = Depends(require("admin"))):
     try:
         base = insights(db, key)
     except KeyError:

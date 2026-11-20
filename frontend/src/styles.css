@@ -52,6 +52,10 @@ pre { background: var(--input-bg); border: 1px solid var(--border); border-radiu
 .nav a { display: flex; justify-content: space-between; align-items: center; padding: 8px 18px; color: var(--text); border-left: 3px solid transparent; }
 .nav a:hover { background: var(--panel-2); text-decoration: none; }
 .nav a.active { border-left-color: var(--accent); background: var(--panel-2); }
+.nav-group { margin-bottom: 10px; }
+.nav-title { display: flex; justify-content: space-between; align-items: center; width: 100%; padding: 6px 18px 4px; background: none; border: 0; border-radius: 0; color: var(--muted); font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .06em; text-align: left; }
+button.nav-title { cursor: pointer; }
+button.nav-title:hover { color: var(--text); background: none; }
 .nav .count { background: var(--accent-2); color: #fff; border-radius: 10px; padding: 0 7px; font-size: 11px; }
 .sidebar .foot { margin-top: auto; padding: 8px; border-top: 1px solid var(--border); position: relative; }
 .user-btn { display: flex; align-items: center; gap: 10px; width: 100%; background: none; border: 1px solid transparent; padding: 6px 8px; text-align: left; }

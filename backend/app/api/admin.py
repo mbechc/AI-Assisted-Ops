@@ -105,7 +105,7 @@ def put_settings(body: SettingsIn, db: Session = Depends(get_db), admin: User = 
 
 @router.get("/audit")
 def list_audit(limit: int = 100, offset: int = 0, action: str | None = None, q: str | None = None,
-               db: Session = Depends(get_db), _=Depends(require("operator"))):
+               db: Session = Depends(get_db), _=Depends(require("admin"))):
     stmt = select(AuditLog)
     if action:
         stmt = stmt.where(AuditLog.action.like(f"{action}%"))

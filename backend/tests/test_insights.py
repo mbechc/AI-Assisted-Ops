@@ -54,7 +54,7 @@ def test_rule_based_insights(update_dir):
 
 
 def test_ai_summary_requires_ai(update_dir):
-    c, db = _client("operator")
+    c, db = _client("admin")
     _seed(db)
     r = c.post(f"/api/tasks/{TASK}/insights/ai")
     assert r.status_code == 400 and "AI is off" in r.json()["detail"]
@@ -63,7 +63,7 @@ def test_ai_summary_requires_ai(update_dir):
 
 def test_ai_summary_validated_and_cached(update_dir, monkeypatch):
     import app.api.tasks as tasks_api
-    c, db = _client("operator")
+    c, db = _client("admin")
     _seed(db)
     monkeypatch.setattr(tasks_api, "get_provider", lambda db: FakeLLM())
     monkeypatch.setattr(tasks_api, "effective_mode", lambda db: "local")

@@ -118,7 +118,7 @@ def delete_source(source_id: int, db: Session = Depends(get_db), admin: User = D
 
 
 @router.post("/{source_id}/test")
-def test_source(source_id: int, db: Session = Depends(get_db), user: User = Depends(require("operator"))):
+def test_source(source_id: int, db: Session = Depends(get_db), user: User = Depends(require("admin"))):
     s = db.get(DataSource, source_id)
     if s is None:
         raise HTTPException(404, "not found")

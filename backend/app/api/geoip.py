@@ -171,7 +171,7 @@ class MappingIn(BaseModel):
 
 @router.put("/{source_id}/geoip/mappings")
 def put_mapping(source_id: int, body: MappingIn, db: Session = Depends(get_db),
-                user: User = Depends(require("operator"))):
+                user: User = Depends(require("admin"))):
     s = _geo_source(db, source_id)
     hierarchy = ""
     if body.cc_source_id is not None:
@@ -197,7 +197,7 @@ def put_mapping(source_id: int, body: MappingIn, db: Session = Depends(get_db),
 
 @router.delete("/{source_id}/geoip/mappings/{mapping_id}")
 def delete_mapping(source_id: int, mapping_id: int, db: Session = Depends(get_db),
-                   user: User = Depends(require("operator"))):
+                   user: User = Depends(require("admin"))):
     s = _geo_source(db, source_id)
     m = db.get(GeoipMapping, mapping_id)
     if m is None or m.source_id != s.id:

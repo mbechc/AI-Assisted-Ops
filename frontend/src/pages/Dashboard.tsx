@@ -55,7 +55,7 @@ export default function Dashboard() {
         <div>
           <h1>Dashboard</h1>
           <p className="sub">
-            Review queue: {open} open, {change === 0 ? "unchanged" : change < 0 ? `${-change} fewer` : `${change} more`} than
+            Inbox: {open} open, {change === 0 ? "unchanged" : change < 0 ? `${-change} fewer` : `${change} more`} than
             24 hours ago. The graph behind each category shows the last 30 days. Click a category to review it.
           </p>
         </div>
@@ -67,7 +67,7 @@ export default function Dashboard() {
           const t = trend(k.change_24h);
           return (
             <div key={k.key} className={`card kpi ${t}`} role="link" tabIndex={0}
-              onClick={() => nav(`/review?task=${k.key}&status=${k.reported > k.proposed ? "reported" : "proposed"}`)}
+              onClick={() => nav(`/inbox?task=${k.key}&status=${k.reported > k.proposed ? "reported" : "proposed"}`)}
               onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLElement).click()}>
               <Backdrop series={k.history} />
               <div className="kpi-body">

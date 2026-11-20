@@ -64,7 +64,7 @@ def get_owner_reports(db: Session = Depends(get_db), _=Depends(current_user)):
 
 
 @router.post("/digest/owner-reports/ai")
-def owner_report_ai(body: OwnerAiIn, db: Session = Depends(get_db), user: User = Depends(require("operator"))):
+def owner_report_ai(body: OwnerAiIn, db: Session = Depends(get_db), user: User = Depends(require("admin"))):
     p = _provider_or_400(db)
     g = next((g for g in digest.owner_groups(db) if g["class"] == body.cls), None)
     if g is None:

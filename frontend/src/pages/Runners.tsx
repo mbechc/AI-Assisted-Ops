@@ -36,6 +36,12 @@ function Usage({ c }: { c: ContainerInfo | null }) {
   );
 }
 
+/** Expert Task settings are admin-only; others see the name without a link. */
+function TaskLink({ task, style, children }: { task: string; style?: React.CSSProperties; children: React.ReactNode }) {
+  const { can } = useAuth();
+  return can("admin") ? <Link to={`/tasks/${task}`} style={style}>{children}</Link> : <span style={style}>{children}</span>;
+}
+
 export default function Runners() {
   const { can } = useAuth();
   const data = useAsync(() => api.get<RunnersOverview>("/runners"), [], 10000);
@@ -112,7 +118,7 @@ function WorkerCard({ w, onRun, canLogs }: { w: RunnerWorker; onRun: (id: number
       <div className="kv small" style={{ marginTop: 10 }}>
         <div className="k">Heartbeat</div><div>{w.heartbeat ? `${ago(w.heartbeat.ts)} ago, ${w.heartbeat.hostname}, concurrency ${w.heartbeat.concurrency ?? "?"}` : "none"}</div>
         <div className="k">Up / restarts</div><div>{w.container ? `${ago(w.container.started_at)}, ${w.container.restarts} restart(s)` : w.heartbeat ? ago(w.heartbeat.started_at) : "-"}{w.restarts_seen ? ` (${w.restarts_seen} seen by heartbeat)` : ""}</div>
-        <div className="k">Tasks</div><div>{w.tasks.map((t) => <Link key={t} to={`/tasks/${t}`} style={{ marginRight: 8 }}>{t}</Link>)}</div>
+        <div className="k">Tasks</div><div>{w.tasks.map((t) => <TaskLink key={t} task={t} style={{ marginRight: 8 }}>{t}</TaskLink>)}</div>
       </div>
       {(w.active.length > 0 || w.queued_runs.length > 0) && (
         <>
@@ -155,7 +161,7 @@ function Timeline({ d, onRun }: { d: RunnersOverview; onRun: (id: number) => voi
         {d.schedule.map((s) => (
           <div className="lane" key={s.task_key} style={{ opacity: s.enabled ? 1 : 0.4 }}>
             <div className="name" title={`${s.name} (${s.cron} UTC)`}>
-              <Link to={`/tasks/${s.task_key}`}>{s.name}</Link> <span className="muted">{s.worker}</span>
+              <TaskLink task={s.task_key}>{s.name}</TaskLink> <span className="muted">{s.worker}</span>
             </div>
             <div style={{ position: "absolute", left: 200, right: 8, top: 0, bottom: 0 }}>
               {s.next.map((t) => {
@@ -174,7 +180,7 @@ function Timeline({ d, onRun }: { d: RunnersOverview; onRun: (id: number) => voi
         <tbody>
           {d.schedule.map((s) => (
             <tr key={s.task_key}>
-              <td><Link to={`/tasks/${s.task_key}`}>{s.name}</Link>{!s.enabled && <span className="badge muted" style={{ marginLeft: 6 }}>disabled</span>}</td>
+              <td><TaskLink task={s.task_key}>{s.name}</TaskLink>{!s.enabled && <span className="badge muted" style={{ marginLeft: 6 }}>disabled</span>}</td>
               <td className="small">{s.worker}</td>
               <td><code>{s.cron}</code></td>
               <td className="small">{s.next[0] ? fmtDate(s.next[0]) : "-"}</td>

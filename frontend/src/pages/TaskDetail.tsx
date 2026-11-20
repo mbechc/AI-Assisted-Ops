@@ -71,8 +71,8 @@ export default function TaskDetail() {
           </p>
         </div>
         <div className="row">
-          <Link to={`/review?task=${t.key}&status=proposed`}><button>Review queue ({t.counts.proposed || 0})</button></Link>
-          {can("operator") && <button className="primary" onClick={runNow}>Run now</button>}
+          <Link to={`/inbox?task=${t.key}&status=proposed`}><button>Inbox ({t.counts.proposed || 0})</button></Link>
+          {can("admin") && <button className="primary" onClick={runNow}>Run now</button>}
         </div>
       </div>
       {msg && <div className="banner info">{msg}</div>}
@@ -328,7 +328,7 @@ function OwnerReports() {
             <div className="row" style={{ justifyContent: "space-between" }}>
               <button className="link" onClick={() => setOpen(open === g.class ? null : g.class)}><b>{g.label}</b> ({g.count} devices)</button>
               <div className="row">
-                {aiOn && can("operator") && !useAi && <button disabled={busy === g.class} onClick={() => write(g.class)}>{busy === g.class ? "Writing..." : "Write with AI"}</button>}
+                {aiOn && can("admin") && !useAi && <button disabled={busy === g.class} onClick={() => write(g.class)}>{busy === g.class ? "Writing..." : "Write with AI"}</button>}
                 <button onClick={() => copy(g.class, `${title}\n\n${body}`)}>{copied === g.class ? "Copied" : "Copy ticket"}</button>
               </div>
             </div>
@@ -416,7 +416,7 @@ function InsightsView({ task }: { task: Task }) {
         ) : <p className="muted">No reviewer notes on rejected or overridden items.</p>}
         <ErrorLine error={err} />
         {aiOn ? (
-          can("operator") && !d.ai && d.decided > 0 && <button className="primary" disabled={busy} onClick={summarise}>{busy ? "Summarising..." : "Summarise with AI"}</button>
+          can("admin") && !d.ai && d.decided > 0 && <button className="primary" disabled={busy} onClick={summarise}>{busy ? "Summarising..." : "Summarise with AI"}</button>
         ) : <p className="small muted">With AI on (Settings, AI assistance), notes can be summarised into themes and suggested parameter changes.</p>}
       </div>
     </div>

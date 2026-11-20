@@ -23,6 +23,7 @@ if [ "$purge" = 1 ]; then
   # shellcheck disable=SC2086
   [ -n "$images" ] && docker image rm $images >/dev/null 2>&1 || true
   remove_updater
+  rm -f /etc/sysctl.d/90-aiops.conf
   rm -rf "$INSTALL_DIR"
   c_ok "AIOps removed completely"
 else

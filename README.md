@@ -19,7 +19,7 @@ assurance, maps and reports. AIOps works through that backlog continuously.
   choose a local LLM (Ollama, CPU only, nothing leaves the host) or Azure OpenAI in your own tenant.
 - **Safe change path.** Every change goes through the Catalyst Center API. Nothing connects to WLCs, APs
   or switches directly (no SSH, NETCONF or Command Runner).
-- **Accountable.** Every approval, change, setting and log view is in the audit log; a review queue
+- **Accountable.** Every approval, change, setting and log view is in the audit log; the Inbox
   dashboard shows the trend per category over 30 days.
 - **Isolated workers.** Each domain runs in its own container and queue, so one runaway task cannot stall
   the others.
@@ -127,7 +127,8 @@ configure the Docker daemon proxy as well, so image pulls work.
 2. **Data sources**: add the Catalyst Center (URL, a user with network-admin or an assign-device role),
    then **Test**, which detects the release and shows which API variant each operation uses.
 3. **Expert Tasks**: press **Run** on a task (or open it to set its source and schedule), then review
-   the proposals in **Review queue**. Schedules are cron expressions in UTC with presets on the task page.
+   the proposals in the **Inbox** (what needs a human now; **Activity** shows what was decided or
+   automated). Schedules are cron expressions in UTC with presets on the task page.
 4. As calibration builds up (approved vs. rejected per confidence band), raise the autonomy level. Every
    task has a cap; the global cap and the kill switch are under **Settings**. The global cap starts at
    L1 (human review) on a fresh install. Effective level = min(selected, task cap, global cap).
@@ -160,10 +161,23 @@ task run uses the new mode.
   with the *Cognitive Services OpenAI User* role. **Test connection** sends a tiny prompt; secrets are
   stored encrypted and never shown again.
 
+### Menu and roles
+
+The sidebar has three groups:
+
+| Group | Pages | Who |
+|---|---|---|
+| **Work** | Dashboard, Inbox (what needs a human now), Activity (what was decided or automated) | Everyone; operators and admins decide |
+| **Configure** | Expert Tasks, Data sources, Users, Settings | Admins only |
+| **Observe** | Run history, Runners, Container logs, Audit log | Everyone; Container logs and Audit log admins only |
+
+Users have one of three roles: viewer (read only), operator (decides in the Inbox) and admin (everything).
+See [Roles and permissions](docs/PERMISSIONS.md) for every page and action.
+
 ## Updates
 
 **Settings → Updates** shows the installed version, the track and the newest release for that track.
-Administrators switch track, refresh and install; operators and viewers see the same information read-only.
+Settings is admin-only; admins switch track, refresh and install.
 
 | Track | Offers |
 |---|---|
@@ -230,6 +244,12 @@ All scripts are in `/opt/AIOps`:
 | `scripts/uninstall.sh [--purge]` | Remove containers (`--purge`: also data, model, images and the updater units) |
 
 Keep a copy of `.env`: it contains the key that encrypts stored Catalyst Center credentials.
+
+**Kernel setting for Redis.** The installer sets `vm.overcommit_memory = 1` in
+`/etc/sysctl.d/90-aiops.conf`, which Redis needs for reliable background saves (otherwise it logs
+*WARNING Memory overcommit must be enabled*). If the installer could not set it (for example inside a
+locked-down container host), run `sudo sysctl -w vm.overcommit_memory=1` and add the line to
+`/etc/sysctl.d/90-aiops.conf`. `uninstall.sh --purge` removes the file.
 
 **Workers, Runners and logs.** Tasks run in separate worker containers (`worker-default`,
 `worker-wireless`, `worker-inventory`, `worker-health`), each with its own queue, memory limit and

@@ -76,7 +76,7 @@ def test_shift_ai_off(update_dir):
 
 def test_owner_reports(update_dir, monkeypatch):
     import app.api.digest as api
-    c, db = _client("operator")
+    c, db = _client("admin")
     _seed(db)
     g = c.get("/api/digest/owner-reports").json()["groups"]
     assert len(g) == 1 and g[0]["class"] == "credential" and g[0]["count"] == 3
@@ -92,7 +92,7 @@ def test_owner_reports(update_dir, monkeypatch):
 
 def test_owner_report_ai_accepted(update_dir, monkeypatch):
     import app.api.digest as api
-    c, db = _client("operator")
+    c, db = _client("admin")
     _seed(db)
     full = FakeLLM({"title": "Credential failure on 3 switches", "body": "sw0, sw1 and sw2: update credentials."})
     monkeypatch.setattr(api, "get_provider", lambda db: full)

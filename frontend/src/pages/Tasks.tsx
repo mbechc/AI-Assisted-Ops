@@ -49,7 +49,7 @@ export default function Tasks() {
           <h2>{cat}</h2>
           <table>
             <thead>
-              <tr><th>Task</th><th>Schedule</th><th>Autonomy (effective / cap)</th><th className="num">Review</th><th className="num">Done</th><th>Last run</th><th>Next run</th>{can("operator") && <th />}</tr>
+              <tr><th>Task</th><th>Schedule</th><th>Autonomy (effective / cap)</th><th className="num">Review</th><th className="num">Done</th><th>Last run</th><th>Next run</th>{can("admin") && <th />}</tr>
             </thead>
             <tbody>
               {tasks.map((t) => {
@@ -74,7 +74,7 @@ export default function Tasks() {
                     <td className="num">{t.counts.done || 0}</td>
                     <td>{t.last_run ? <Status value={t.last_run.status} /> : <span className="muted">never</span>}</td>
                     <td className="small">{t.config.enabled ? fmtDate(t.next_run) : "-"}</td>
-                    {can("operator") && (
+                    {can("admin") && (
                       <td className="num">
                         <button disabled={active || starting === t.key} onClick={() => run(t)}
                           title={active ? "A run is already queued or running" : "Start a run now"}>

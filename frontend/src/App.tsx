@@ -1,5 +1,5 @@
-import { createContext, useContext, useEffect, useRef, useState } from "react";
-import { NavLink, Navigate, Route, Routes } from "react-router-dom";
+import { createContext, ReactNode, useContext, useEffect, useRef, useState } from "react";
+import { NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { api, ConnectionError, isOnline, LOST_CONNECTION, probe } from "./api";
 import { useAsync } from "./components";
 import { applyTheme } from "./theme";
@@ -131,21 +131,30 @@ function Shell() {
       <aside className="sidebar">
         <div className="brand">
           AIOps
-          <small>Local AI operations assistant</small>
+          <small>Catalyst Center operations assistant</small>
         </div>
         <nav className="nav">
-          <NavLink to="/" end>Dashboard</NavLink>
-          <NavLink to="/review">
-            Review queue {pending > 0 && <span className="count">{pending}</span>}
-          </NavLink>
-          <NavLink to="/tasks">Expert Tasks</NavLink>
-          <NavLink to="/runs">Run history</NavLink>
-          <NavLink to="/runners">Runners</NavLink>
-          {can("admin") && <NavLink to="/logs">Container logs</NavLink>}
-          <NavLink to="/sources">Data sources</NavLink>
-          {can("operator") && <NavLink to="/audit">Audit log</NavLink>}
-          {can("admin") && <NavLink to="/users">Users</NavLink>}
-          <NavLink to="/settings">Settings</NavLink>
+          <NavGroup id="work" title="Work">
+            <NavLink to="/" end>Dashboard</NavLink>
+            <NavLink to="/inbox">
+              Inbox {pending > 0 && <span className="count">{pending}</span>}
+            </NavLink>
+            <NavLink to="/activity">Activity</NavLink>
+          </NavGroup>
+          {can("admin") && (
+            <NavGroup id="configure" title="Configure" collapsible paths={CONFIGURE}>
+              <NavLink to="/tasks">Expert Tasks</NavLink>
+              <NavLink to="/sources">Data sources</NavLink>
+              <NavLink to="/users">Users</NavLink>
+              <NavLink to="/settings">Settings</NavLink>
+            </NavGroup>
+          )}
+          <NavGroup id="observe" title="Observe" collapsible paths={OBSERVE}>
+            <NavLink to="/runs">Run history</NavLink>
+            <NavLink to="/runners">Runners</NavLink>
+            {can("admin") && <NavLink to="/logs">Container logs</NavLink>}
+            {can("admin") && <NavLink to="/audit">Audit log</NavLink>}
+          </NavGroup>
         </nav>
         <UserMenu />
       </aside>
@@ -158,20 +167,64 @@ function Shell() {
         )}
         <Routes>
           <Route path="/" element={<Dashboard />} />
-          <Route path="/review" element={<Review />} />
-          <Route path="/tasks" element={<Tasks />} />
-          <Route path="/tasks/:key" element={<TaskDetail />} />
+          <Route path="/inbox" element={<Review view="inbox" />} />
+          <Route path="/activity" element={<Review view="activity" />} />
+          <Route path="/review" element={<LegacyReview />} />
+          <Route path="/tasks" element={<Admin><Tasks /></Admin>} />
+          <Route path="/tasks/:key" element={<Admin><TaskDetail /></Admin>} />
           <Route path="/runs" element={<Runs />} />
           <Route path="/runners" element={<Runners />} />
-          <Route path="/logs" element={<Logs />} />
-          <Route path="/sources" element={<Sources />} />
-          <Route path="/sources/:id/geoip" element={<GeoipSource />} />
-          <Route path="/audit" element={<Audit />} />
-          <Route path="/users" element={<Users />} />
-          <Route path="/settings" element={<Settings />} />
+          <Route path="/logs" element={<Admin><Logs /></Admin>} />
+          <Route path="/sources" element={<Admin><Sources /></Admin>} />
+          <Route path="/sources/:id/geoip" element={<Admin><GeoipSource /></Admin>} />
+          <Route path="/audit" element={<Admin><Audit /></Admin>} />
+          <Route path="/users" element={<Admin><Users /></Admin>} />
+          <Route path="/settings" element={<Admin><Settings /></Admin>} />
           <Route path="*" element={<Navigate to="/" />} />
         </Routes>
       </main>
+    </div>
+  );
+}
+
+const CONFIGURE = ["/tasks", "/sources", "/users", "/settings"];
+const OBSERVE = ["/runs", "/runners", "/logs", "/audit"];
+
+function Admin({ children }: { children: ReactNode }) {
+  return useAuth().can("admin") ? <>{children}</> : <Navigate to="/" replace />;
+}
+
+/** Old /review links: open items go to the Inbox, decided ones to Activity. */
+function LegacyReview() {
+  const { search } = useLocation();
+  const statuses = new URLSearchParams(search).getAll("status").flatMap((v) => v.split(","));
+  const decided = statuses.length > 0 && statuses.every((v) => v !== "proposed" && v !== "reported");
+  return <Navigate to={`/${decided ? "activity" : "inbox"}${search}`} replace />;
+}
+
+function NavGroup({ id, title, collapsible, paths = [], children }: {
+  id: string; title: string; collapsible?: boolean; paths?: string[]; children: ReactNode;
+}) {
+  const key = `aiops.nav.${id}`;
+  const [open, setOpen] = useState(() => localStorage.getItem(key) !== "closed");
+  const { pathname } = useLocation();
+  const here = paths.some((p) => pathname === p || pathname.startsWith(`${p}/`));
+  useEffect(() => {
+    if (here) setOpen(true);
+  }, [here]);
+  const toggle = () => {
+    localStorage.setItem(key, open ? "closed" : "open");
+    setOpen(!open);
+  };
+  const shown = !collapsible || open;
+  return (
+    <div className="nav-group">
+      {collapsible ? (
+        <button className="nav-title" aria-expanded={shown} onClick={toggle}>
+          {title}<span className="chev" aria-hidden>{shown ? "\u25BE" : "\u25B8"}</span>
+        </button>
+      ) : <div className="nav-title">{title}</div>}
+      {shown && children}
     </div>
   );
 }

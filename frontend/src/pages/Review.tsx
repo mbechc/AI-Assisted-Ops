@@ -4,19 +4,32 @@ import { useAuth } from "../App";
 import { api, fmtDate, qsMulti } from "../api";
 import { Confidence, Drawer, ErrorLine, Pager, Status, useAsync } from "../components";
 import FilterBar, { filterOptions } from "../FilterBar";
-import { Filter, filtersToApi, filtersToDecide, filtersToQuery, parseFilters, upsert } from "../reviewFilters";
+import { Filter, View, filtersToApi, filtersToDecide, filtersToQuery, parseFilters, upsert } from "../reviewFilters";
 import { Facets, Group, Site, Task, WorkItem } from "../types";
 
 const LIMIT = 100;
 
-export default function Review() {
+const HEAD: Record<View, { title: string; sub: string }> = {
+  inbox: {
+    title: "Inbox",
+    sub: "What needs a human now: approve, override or reject what the Expert Tasks propose, and read open findings. Decisions train the confidence calibration.",
+  },
+  activity: {
+    title: "Activity",
+    sub: "What has happened: items approved, executed, failed, rejected or superseded, by people and by automation. Newest first.",
+  },
+};
+
+export default function Review({ view: scope }: { view: View }) {
   const [sp, setSp] = useSearchParams();
   const tasks = useAsync(() => api.get<Task[]>("/tasks"), []);
-  const filters = useMemo(() => parseFilters(sp), [sp]);
+  const filters = useMemo(() => parseFilters(sp, scope), [sp, scope]);
   const q = sp.get("q") || "";
-  const apiParams = useMemo(() => filtersToApi(filters, q), [filters, q]);
+  const apiParams = useMemo(() => filtersToApi(filters, q, scope), [filters, q, scope]);
   const key = JSON.stringify(apiParams);
-  const [view, setView] = useState<"groups" | "list">("groups");
+  const inbox = scope === "inbox";
+  const [tab, setView] = useState<"groups" | "list">(inbox ? "groups" : "list");
+  const view = inbox ? tab : "list";
   const [offset, setOffset] = useState(0);
   const [selected, setSelected] = useState<Set<number>>(new Set());
   const [openItem, setOpenItem] = useState<number | null>(null);
@@ -24,11 +37,15 @@ export default function Review() {
   const [err, setErr] = useState<string | null>(null);
 
   useEffect(() => { setOffset(0); setSelected(new Set()); }, [key]);
+  useEffect(() => setView(inbox ? "groups" : "list"), [inbox]);
 
   const facets = useAsync(() => api.get<Facets>(`/review/facets${qsMulti(apiParams)}`), [key], 20000);
-  const groups = useAsync(() => api.get<{ groups: Group[] }>(`/items/groups${qsMulti(apiParams)}`), [key], 20000);
+  const groups = useAsync(
+    () => (inbox ? api.get<{ groups: Group[] }>(`/items/groups${qsMulti(apiParams)}`) : Promise.resolve({ groups: [] })),
+    [key], 20000);
   const items = useAsync(
-    () => api.get<{ total: number; items: WorkItem[] }>(`/items${qsMulti({ ...apiParams, limit: LIMIT, offset })}`),
+    () => api.get<{ total: number; items: WorkItem[] }>(
+      `/items${qsMulti({ ...apiParams, limit: LIMIT, offset, ...(inbox ? {} : { sort: "-updated" }) })}`),
     [key, offset], 20000);
 
   const setFilters = (f: Filter[], text: string) => setSp(new URLSearchParams(filtersToQuery(f, text)));
@@ -62,22 +79,24 @@ export default function Review() {
     <>
       <div className="page-head">
         <div>
-          <h1>Review queue</h1>
-          <p className="sub">Approve, override or reject what the Expert Tasks propose. Decisions train the confidence calibration.</p>
+          <h1>{HEAD[scope].title}</h1>
+          <p className="sub">{HEAD[scope].sub}</p>
         </div>
       </div>
-      <FilterBar filters={filters} q={q} total={items.data?.total} facets={facets.data} tasks={tasks.data || []}
+      <FilterBar view={scope} filters={filters} q={q} total={items.data?.total} facets={facets.data} tasks={tasks.data || []}
         onChange={setFilters} />
       {msg && <div className="banner info">{msg}</div>}
       <ErrorLine error={err || items.error || groups.error || facets.error} />
-      <div className="tabs">
-        <button className={view === "groups" ? "active" : ""} onClick={() => setView("groups")}>
-          By group ({groups.data?.groups.length ?? 0})
-        </button>
-        <button className={view === "list" ? "active" : ""} onClick={() => setView("list")}>
-          Items ({items.data?.total ?? 0})
-        </button>
-      </div>
+      {inbox && (
+        <div className="tabs">
+          <button className={view === "groups" ? "active" : ""} onClick={() => setView("groups")}>
+            By group ({groups.data?.groups.length ?? 0})
+          </button>
+          <button className={view === "list" ? "active" : ""} onClick={() => setView("list")}>
+            Items ({items.data?.total ?? 0})
+          </button>
+        </div>
+      )}
       {view === "groups" ? (
         <GroupsView
           groups={groups.data?.groups || null} taskName={taskName} sourceName={sourceName} showSource={sourceCount > 1}
@@ -94,7 +113,7 @@ export default function Review() {
         />
       ) : (
         <div className="card">
-          <div className="row" style={{ marginBottom: 10 }}>
+          {inbox && <div className="row" style={{ marginBottom: 10 }}>
             <span className="muted small">
               {selected.size ? `${selected.size} selected` : "Select items awaiting review to approve or reject them together."}
             </span>
@@ -105,7 +124,7 @@ export default function Review() {
               onReject={(note) => decide({ decision: "reject", ids: [...selected], note }, "Rejected")}
               onApproveFilter={() => decide({ decision: "approve", filter: filtersToDecide(filters, q) }, "Approved all matching")}
             />
-          </div>
+          </div>}
           <ItemsTable
             items={items.data?.items || []} selected={selected} setSelected={setSelected} onOpen={setOpenItem}
             taskName={taskName} sourceName={sourceName} showSource={sourceCount > 1}

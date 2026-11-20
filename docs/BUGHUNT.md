@@ -7,10 +7,10 @@ Status: **open**, **fixed in X.Y.Z** or **won't fix**.
 
 | # | Area | Problem | Status |
 |---|---|---|---|
-| 1 | Login | The Apple Passwords app (and Safari/iCloud Keychain) does not recognise the login form, so it neither fills in nor offers to save the username and password | open |
-| 2 | Dashboard | "Since last shift" shows a raw Python traceback for a failed run instead of a short, readable message | open |
-| 3 | Wrong-site detection | Run 27 failed with a database error: two tasks wrote the same cache entry at the same time (`duplicate key ... cache_entries_pkey`) | open |
-| 4 | Installer | Redis warns at every start that memory overcommit is disabled (`vm.overcommit_memory`) | open |
+| 1 | Login | The Apple Passwords app (and Safari/iCloud Keychain) does not recognise the login form, so it neither fills in nor offers to save the username and password | fixed in 0.2.5-dev.4 |
+| 2 | Dashboard | "Since last shift" shows a raw Python traceback for a failed run instead of a short, readable message | fixed in 0.2.5-dev.4 |
+| 3 | Wrong-site detection | Run 27 failed with a database error: two tasks wrote the same cache entry at the same time (`duplicate key ... cache_entries_pkey`) | fixed in 0.2.5-dev.4 |
+| 4 | Installer | Redis warns at every start that memory overcommit is disabled (`vm.overcommit_memory`) | fixed in 0.2.5-dev.4 |
 | 5 | Workers | worker-inventory restarted on 19 Nov 16:22 while a run was active (run marked failed as orphaned); cause unknown | open, needs info |
 
 ## Notes

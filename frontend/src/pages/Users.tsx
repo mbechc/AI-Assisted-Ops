@@ -33,7 +33,10 @@ export default function Users() {
   return (
     <>
       <div className="page-head">
-        <div><h1>Users</h1><p className="sub">Viewer: read only. Operator: review and run tasks. Admin: autonomy, caps, sources and users.</p></div>
+        <div><h1>Users</h1><p className="sub">
+          Viewer: read only. Operator: decides in the Inbox. Admin: everything, including Configure, Container logs and the
+          Audit log. See <a href="https://github.com/mbechc/AI-Assisted-Ops/blob/master/docs/PERMISSIONS.md" target="_blank" rel="noreferrer">Roles and permissions</a>.
+        </p></div>
         <button className="primary" onClick={() => setForm({ username: "", password: "", role: "operator" })}>Add user</button>
       </div>
       <ErrorLine error={err || users.error} />
@@ -61,8 +64,8 @@ export default function Users() {
         <Modal onClose={() => setForm(null)}>
           <h2>Add user</h2>
           <ErrorLine error={err} />
-          <label className="field">Username<input value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} /></label>
-          <label className="field">Password (min 10 characters)<input type="password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} /></label>
+          <label className="field">Username<input autoComplete="off" value={form.username} onChange={(e) => setForm({ ...form, username: e.target.value })} /></label>
+          <label className="field">Password (min 10 characters)<input type="password" autoComplete="new-password" value={form.password} onChange={(e) => setForm({ ...form, password: e.target.value })} /></label>
           <label className="field">Role
             <select value={form.role} onChange={(e) => setForm({ ...form, role: e.target.value as Role })}>
               <option value="viewer">viewer</option><option value="operator">operator</option><option value="admin">admin</option>

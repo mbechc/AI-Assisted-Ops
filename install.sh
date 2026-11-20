@@ -236,6 +236,21 @@ open_firewall() {
   fi
 }
 
+# Redis needs memory overcommit for reliable background saves. This is a host kernel setting; containers
+# cannot change it.
+tune_kernel() {
+  local conf=/etc/sysctl.d/90-aiops.conf
+  if [ "$(sysctl -n vm.overcommit_memory 2>/dev/null || echo 0)" = 1 ] && [ -f "$conf" ]; then
+    return 0
+  fi
+  if printf '# AIOps: Redis background saves need memory overcommit\nvm.overcommit_memory = 1\n' >"$conf" 2>/dev/null \
+      && sysctl -q -p "$conf" >/dev/null 2>&1; then
+    c_ok "Kernel: vm.overcommit_memory = 1 ($conf)"
+  else
+    c_warn "Could not set vm.overcommit_memory = 1; Redis will warn about it (see README.md)"
+  fi
+}
+
 # ------------------------------------------------------------------ host updater
 
 # The portal drops request files into data/update/requests; this path unit runs scripts/update.sh
@@ -356,6 +371,7 @@ main() {
   stage_files
   configure_env
   open_firewall
+  tune_kernel
   install_updater
 
   if [ -n "$OFFLINE_BUNDLE" ]; then load_offline_bundle

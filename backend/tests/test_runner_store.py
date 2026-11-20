@@ -60,6 +60,19 @@ def test_llm_review_per_mode(mode):
     assert not runner._llm_review(ctx, defn, _proposals(), prev)["t0"].get("reused"), "reuse needs the same provider"
 
 
+def test_run_errors_are_readable():
+    from sqlalchemy.exc import IntegrityError
+    from app.connectors.catalyst_center.http import CCError
+    assert "Database conflict" in runner.friendly_error(IntegrityError("INSERT", {}, Exception("dup")))
+    assert runner.friendly_error(CCError(503, "busy", "/x")) == "Catalyst Center request failed (HTTP 503): busy"
+    assert runner.friendly_error(RuntimeError("no enabled catalyst_center data source configured\nmore")) == \
+        "no enabled catalyst_center data source configured"
+    old = ('Traceback (most recent call last):\n  File "/usr/local/lib/x.py", line 1\nsqlalchemy.exc.IntegrityError: '
+           '(psycopg.errors.UniqueViolation) duplicate key\n')
+    assert runner.display_error(old).startswith("Database error")
+    assert runner.display_error("plain message") == "plain message"
+
+
 def test_llm_unavailable_falls_back_to_rules():
     defn = type("D", (), {"llm_system_prompt": "sys"})()
     ctx = type("C", (), {"params": {}, "log": lambda self, m: None})()

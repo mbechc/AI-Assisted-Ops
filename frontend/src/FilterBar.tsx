@@ -2,7 +2,7 @@ import { KeyboardEvent, ReactNode, useEffect, useRef, useState } from "react";
 import { api } from "./api";
 import { useAsync } from "./components";
 import {
-  ATTRS, Attr, Filter, STATUS_LABELS, attrLabel, filtersToQuery, opDef, parseFilters, upsert,
+  ATTRS, Attr, Filter, SCOPE, STATUS_LABELS, View, attrLabel, filtersToQuery, opDef, parseFilters, upsert,
 } from "./reviewFilters";
 import { Facets, SavedFilter, Task } from "./types";
 
@@ -22,7 +22,7 @@ function useOutside(ref: React.RefObject<HTMLElement | null>, onOutside: () => v
 }
 
 /** Value lists (with counts) and display names for each attribute. */
-export function filterOptions(facets: Facets | null, tasks: Task[]) {
+export function filterOptions(facets: Facets | null, tasks: Task[], view: View = "inbox") {
   const taskName = (k: string) => tasks.find((t) => t.key === k)?.name || k;
   const count = (list: { value: string; count: number }[] | undefined, v: string) => list?.find((x) => x.value === v)?.count ?? 0;
   const options: Record<Attr, Option[]> = {
@@ -31,7 +31,7 @@ export function filterOptions(facets: Facets | null, tasks: Task[]) {
     task: tasks.filter((t) => t.category !== "Collector")
       .map((t) => ({ value: t.key, label: t.name, count: count(facets?.tasks, t.key) }))
       .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label)),
-    status: Object.entries(STATUS_LABELS).map(([v, label]) => ({ value: v, label, count: count(facets?.statuses, v) })),
+    status: SCOPE[view].map((v) => ({ value: v, label: STATUS_LABELS[v] || v, count: count(facets?.statuses, v) })),
     group: (facets?.groups || []).map((g) => ({ value: g.value, label: g.value, count: g.count })),
     target: [],
     confidence: [],
@@ -47,14 +47,14 @@ export function filterOptions(facets: Facets | null, tasks: Task[]) {
   return { options, label };
 }
 
-export default function FilterBar({ filters, q, total, facets, tasks, onChange }: {
-  filters: Filter[]; q: string; total: number | undefined; facets: Facets | null; tasks: Task[];
+export default function FilterBar({ view, filters, q, total, facets, tasks, onChange }: {
+  view: View; filters: Filter[]; q: string; total: number | undefined; facets: Facets | null; tasks: Task[];
   onChange: (filters: Filter[], q: string) => void;
 }) {
   const [open, setOpen] = useState(false);
   const [editing, setEditing] = useState<number | undefined>(undefined);
   const [search, setSearch] = useState(q);
-  const { options, label } = filterOptions(facets, tasks);
+  const { options, label } = filterOptions(facets, tasks, view);
 
   useEffect(() => setSearch(q), [q]);
   useEffect(() => {
@@ -83,7 +83,7 @@ export default function FilterBar({ filters, q, total, facets, tasks, onChange }
         <SavedFilters current={filtersToQuery(filters, q)}
           onApply={(query) => {
             const sp = new URLSearchParams(query);
-            onChange(parseFilters(sp), sp.get("q") || "");
+            onChange(parseFilters(sp, view), sp.get("q") || "");
           }} />
       </div>
 

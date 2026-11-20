@@ -90,7 +90,7 @@ the mock and never exposed through the Catalyst Center API. The acceptance test 
   full inventory read. The task needs at least 4 changes within 48 hours, so flapping devices appear after
   about 4 collections (roughly 8 hours with the default collector schedule).
 - **Site hierarchy drift is report only (L0).** Its findings have the status *reported*, not *proposed*;
-  filter the review queue on *Reported* or open the task page to see them. Approve the baseline on the task
+  filter the **Inbox** on *Reported* or open the task page to see them. Approve the baseline on the task
   page first; later runs report changes against it.
 - **One Catalyst Center per run.** A task without a selected source runs against the first enabled
   Catalyst Center (the 2.3.5.6 mock). To test the 3.1.3.0 mock, select it as the task's source and press
@@ -140,8 +140,8 @@ Asynchronous operations answer *in progress* on the first poll and finish on the
 
 ### Do findings come back?
 
-- **Not while the mock keeps running.** Fixed items stay fixed, and declined items stay as they are in the
-  review queue.
+- **Not while the mock keeps running.** Fixed items stay fixed, and declined items stay as they are in
+  **Activity**.
 - **Yes after the mock container restarts** (an update, a host reboot, `docker compose restart`). The mock
   rebuilds the same estate from its seed in memory: assignments, names, roles, maintenance schedules and
   tags you changed are gone, and the next runs propose the same fixes again. This makes it easy to repeat

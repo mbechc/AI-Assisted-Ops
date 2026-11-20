@@ -1,14 +1,16 @@
 """Runs task definitions, stores work items, applies autonomy policy and executes approved items."""
 import hashlib
 import logging
-import traceback
 from collections import defaultdict
 from datetime import datetime, timezone
 
+import httpx
 from sqlalchemy import select, update
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.audit import audit
+from app.connectors.catalyst_center.http import CCError
 from app.db import session_scope
 from app.framework import registry
 from app.framework.autonomy import effective_autonomy
@@ -134,9 +136,36 @@ def execute_run(run_id: int) -> None:
                 run = db.get(TaskRun, run_id)
                 if run is not None and run.status == "running":
                     run.status, run.finished_at = "failed", now()
-                    run.error = f"run results could not be saved: {exc}"[-8000:]
+                    run.error = f"Run results could not be saved: {friendly_error(exc)}"
             raise
     dispatch_approved(task_key)
+
+
+def friendly_error(exc: BaseException) -> str:
+    """One readable line for operators; the traceback only goes to the container log."""
+    if isinstance(exc, CCError):
+        return f"Catalyst Center request failed (HTTP {exc.status}): {exc.message[:160]}"
+    if isinstance(exc, httpx.TimeoutException):
+        return "Catalyst Center did not answer in time; the next run will try again."
+    if isinstance(exc, httpx.TransportError):
+        return f"Cannot reach Catalyst Center ({type(exc).__name__})."
+    if isinstance(exc, IntegrityError):
+        return "Database conflict while saving the results (another task wrote the same data); the next run will try again."
+    if isinstance(exc, SQLAlchemyError):
+        return "Database error while saving the results; the next run will try again."
+    first = (str(exc).strip().splitlines() or [""])[0][:300]
+    return first or f"Unexpected error ({type(exc).__name__})."
+
+
+def display_error(text: str | None) -> str | None:
+    """Errors saved by older releases are full tracebacks: show only the final exception line."""
+    if not text or "Traceback (most recent call last)" not in text:
+        return text
+    if "sqlalchemy.exc." in text or "psycopg." in text:
+        return "Database error while saving the results; the next run will try again."
+    last = next((ln.strip() for ln in reversed(text.splitlines())
+                 if ln.strip() and not ln.strip().startswith("(Background on this error")), "")
+    return last.split(": ", 1)[-1][:300] or "Unexpected error."
 
 
 def fail_orphaned_runs(worker: str) -> int:
@@ -173,9 +202,9 @@ def _execute_run(run_id: int) -> None:
             log.exception("run %s failed", run_id)
             db.rollback()
             run = db.get(TaskRun, run_id)
-            ctx.log(f"FAILED: {exc}")
+            run.error = friendly_error(exc)
+            ctx.log(f"FAILED: {run.error} (admins: technical details in Run history > Live container log)")
             run.status = "failed"
-            run.error = "".join(traceback.format_exception(exc))[-8000:]
         finally:
             try:
                 ctx.close()
