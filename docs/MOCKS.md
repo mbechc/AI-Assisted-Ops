@@ -64,6 +64,7 @@ Each mock generates:
 | Device role correction | 20% of distribution switches tagged ACCESS, 2% of floor switches tagged CORE, Odense core switches tagged ACCESS | about 10 to 15 |
 | Expected-down and flapping devices | Offshore switch and 10 APs unreachable for 400 days; about 1.5% of switches (and a few APs) flap | 11 immediately, flapping devices after a few collections |
 | Telemetry baseline | Of the switches: 3% credential failure, 3% SNMP failure, 4% stale sync (3 to 10 days); 0.5% briefly down (must be left alone) | about 10 to 15 |
+| AP uplink health | About 1% of AP switch ports at 100 Mbit half duplex and 1% at 100 Mbit full duplex (bad cable) | about 2% of the APs with an uplink |
 | Site hierarchy drift | An unused floor `F9` and other empty floors (hygiene). Real drift only on request, see below | "No approved baseline" and hygiene findings |
 
 The ground truth (the real floor of every AP, the intended hostnames, the real roles and so on) is kept in
@@ -80,6 +81,7 @@ the mock and never exposed through the Catalyst Center API. The acceptance test 
   | Inventory snapshot (collector) | every 2 hours at :15 |
   | Expected-down and flapping devices | every 4 hours at :20 |
   | Telemetry baseline | every 6 hours at :40 |
+  | AP uplink health | every 6 hours at :50 |
   | AP site assignment | daily 05:30 |
   | Wrong-site detection | daily 05:45 |
   | AP hostname reset | daily 05:50 |

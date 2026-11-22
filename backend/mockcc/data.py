@@ -33,6 +33,7 @@ class Estate:
     site_ids_by_name: dict[str, str] = field(default_factory=dict)
     name_reset: dict[str, str] = field(default_factory=dict)  # AP id -> factory name after POST /mock/reset_names
     stacks: list[str] = field(default_factory=list)  # switch stacks (comma-joined platform and serial)
+    uplink_truth: dict[str, str] = field(default_factory=dict)  # AP id -> half_duplex|low_speed switch port
 
 
 def build(seed: int = 1, total_aps: int = 6000, unassigned_ratio: float = 0.2) -> Estate:
@@ -122,6 +123,7 @@ def build(seed: int = 1, total_aps: int = 6000, unassigned_ratio: float = 0.2) -
                     "band": rng.choice(["2.4GHz", "5GHz"]),
                 } for n in nbrs]
     _specialist_truth(e, seed, floors_all, cities)
+    _uplink_faults(e)
     for s in e.sites:
         s.pop("_switch", None)
         s.pop("_wlc", None)
@@ -155,6 +157,23 @@ def apply_drift(e: Estate) -> dict:
         s["hierarchy"] = full(s)
     e.site_ids_by_name = {s["hierarchy"]: s["id"] for s in e.sites}
     return {"renamed": [renamed["id"]], "moved": [moved["id"]], "added": [added["id"]], "removed": [removed]}
+
+
+def _uplink_faults(e: Estate) -> None:
+    """About 1% of AP switch ports at 100 Mbit half duplex and 1% at 100 Mbit full duplex (bad cable).
+
+    Derived from the AP id, not the RNG, so the rest of the estate is unchanged.
+    """
+    aps = {d["id"] for d in e.devices if d["family"] == "Unified AP"}
+    for link in e.links:
+        ap = link["target"]
+        if ap not in aps or ap in e.expected_down:
+            continue
+        h = int(ap.replace("-", "")[-6:], 16) % 100
+        if h == 0:
+            e.uplink_truth[ap] = "half_duplex"
+        elif h == 1:
+            e.uplink_truth[ap] = "low_speed"
 
 
 def _specialist_truth(e: Estate, seed: int, floors_all, cities) -> None:

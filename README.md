@@ -34,6 +34,10 @@ assurance, maps and reports. AIOps works through that backlog continuously.
 | Expected-down devices | health | L2 | Long-down or flapping devices into maintenance mode (2.3.7+) or an exclusion tag; reverse check returns recovered devices |
 | Telemetry baseline | health | L3 | Classifies missing telemetry (SNMP, credentials, collection failure, stale sync); resyncs stale devices, reports the rest to the owner |
 | Device role correction | inventory | L2 | Access/distribution/core from the CDP/LLDP topology; corrects wrong roles |
+| AP uplink health | health | L0 | APs whose switch port runs half duplex or below 1 Gbit (the classic 100 Mbit half duplex AP), from the topology and the Catalyst Center interface API; report per switch |
+
+See [Use cases](docs/USE_CASES.md) for the operator pain behind each task, with forum sources, and the
+ranked backlog of what comes next.
 
 **GeoIP is optional.** Every task works without it. An uploaded GeoIP database adds one more vote
 (default weight 0.15); a proposal backed only by GeoIP is capped at confidence 60 and never executed

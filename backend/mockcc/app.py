@@ -156,6 +156,37 @@ def topology():
     return {"response": {"nodes": nodes, "links": estate.links}, "version": "1.0"}
 
 
+def _port_speed(name: str) -> str:
+    n = name.lower()
+    return "100000000" if n.startswith("hundred") else "10000000" if n.startswith("ten") else "1000000"
+
+
+def _ports() -> dict[str, list[dict]]:
+    out: dict[str, list[dict]] = {}
+    for link in estate.links:
+        fault = estate.uplink_truth.get(link["target"])
+        down = link["source"] in estate.expected_down or link["target"] in estate.expected_down
+        for dev, port in ((link["source"], link["startPortName"]), (link["target"], link["endPortName"])):
+            out.setdefault(dev, []).append({
+                "id": f"{dev[:8]}-{port}", "deviceId": dev, "portName": port, "interfaceType": "Physical",
+                "speed": "100000" if fault else _port_speed(port),
+                "duplex": "HalfDuplex" if fault == "half_duplex" else "FullDuplex",
+                "status": "down" if down else "up", "adminStatus": "UP", "portMode": "access",
+                "description": "AP uplink" if DEVICES[link["target"]]["family"] == "Unified AP" else "",
+            })
+    return out
+
+
+PORTS = _ports()
+
+
+@app.get("/dna/intent/api/v1/interface/network-device/{device_id}")
+def interfaces(device_id: str):
+    if device_id not in DEVICES:
+        return not_found()
+    return {"response": PORTS.get(device_id, []), "version": "1.0"}
+
+
 # ------------------------------------------------------------- wireless
 
 @app.get("/dna/intent/api/v1/wireless/accesspoint-configuration/summary")
@@ -509,6 +540,7 @@ def truth():
             "role_truth": estate.role_truth,
             "roles": {d["id"]: d["role"] for d in estate.devices if d["id"] in estate.role_truth},
             "telemetry_truth": estate.telemetry_truth,
+            "uplink_truth": estate.uplink_truth,
             "expected_down": sorted(estate.expected_down), "flapping": sorted(estate.flapping),
             "transient_down": sorted(estate.transient_down), "excluded": sorted(excluded_ids()),
             "stacks": estate.stacks}

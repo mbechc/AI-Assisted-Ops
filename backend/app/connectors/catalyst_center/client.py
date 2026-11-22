@@ -5,7 +5,7 @@ from typing import Any
 from app.connectors.catalyst_center.capabilities import INCLUDE_BY_MECHANISM, OPERATIONS, Candidate
 from app.connectors.catalyst_center.http import CCHttp, CCNotSupported, Recorder
 from app.connectors.catalyst_center.models import (
-    ApConfig, Device, Link, RfNeighbor, Site, TaskHandle, TaskResult,
+    ApConfig, Device, Interface, Link, RfNeighbor, Site, TaskHandle, TaskResult,
 )
 from app.connectors.catalyst_center.version import Version, detect_release, format_version, parse_version
 
@@ -129,6 +129,9 @@ class CatalystCenter:
 
     def get_links(self) -> list[Link]:
         return self.call("get_links")
+
+    def get_interfaces(self, device_id: str) -> list[Interface] | None:
+        return self.call("get_interfaces", device_id)
 
     def get_ap_config(self, ap: Device) -> ApConfig | None:
         return self.call("get_ap_config", ap)

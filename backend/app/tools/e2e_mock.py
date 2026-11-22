@@ -408,6 +408,22 @@ def check_telemetry(p: Portal, c: Check, src: dict, url: str, args) -> dict | No
     return run
 
 
+def check_uplinks(p: Portal, c: Check, src: dict, url: str, args) -> dict | None:
+    configure(p, "ap_uplink_health", src["id"], level=0)
+    run = run_task(p, c, "ap_uplink_health", args.timeout)
+    if run is None:
+        return None
+    t = mock_truth(url)["uplink_truth"]
+    its = {i["target_key"]: i for i in items(p, "ap_uplink_health", src["id"], full=True)}
+    exact = all(its[a]["payload"].get("class") == cls for a, cls in t.items() if a in its)
+    info(f"AP uplinks: {dict(Counter(t.values()))} in CC, {len(its)} items")
+    c.expect(set(its) == set(t) and exact, "half duplex and low-speed AP uplinks found exactly",
+             f"AP uplink mismatch ({len(set(its) - set(t))} extra, {len(set(t) - set(its))} missed)")
+    c.expect(all(i["blocked_reason"] for i in its.values()), "AP uplink findings are report-only",
+             "AP uplink items are approvable")
+    return run
+
+
 def check_roles(p: Portal, c: Check, src: dict, url: str, args) -> dict | None:
     configure(p, "device_role_correction", src["id"], level=1)
     run = run_task(p, c, "device_role_correction", args.timeout)
@@ -454,6 +470,7 @@ def check_source(p: Portal, c: Check, src: dict, geo: dict, args):
         check_expected_down(p, c, src, url, args)
         tel = check_telemetry(p, c, src, url, args)
         roles = check_roles(p, c, src, url, args)
+        check_uplinks(p, c, src, url, args)
         for run, worker in ((tel, "health"), (roles, "inventory")):
             if run:
                 follow_run_log(p, c, run, worker)

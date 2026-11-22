@@ -52,6 +52,17 @@ class Link:
 
 
 @dataclass
+class Interface:
+    device_id: str
+    name: str
+    speed_mbps: int | None = None
+    duplex: str | None = None  # FullDuplex | HalfDuplex | AutoNegotiate
+    status: str | None = None  # operational: up | down
+    admin_status: str | None = None
+    description: str | None = None
+
+
+@dataclass
 class ApConfig:
     ap_id: str
     location: str | None = None

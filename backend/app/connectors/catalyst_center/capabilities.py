@@ -14,7 +14,7 @@ from typing import Any, Callable
 
 from app.connectors.catalyst_center.http import CCHttp
 from app.connectors.catalyst_center.models import (
-    ApConfig, Device, Link, RfNeighbor, Site, TaskHandle, TaskResult,
+    ApConfig, Device, Interface, Link, RfNeighbor, Site, TaskHandle, TaskResult,
 )
 from app.connectors.catalyst_center.version import Version
 
@@ -176,6 +176,18 @@ def links_physical_topology(http: CCHttp) -> list[Link]:
         if ln.get("source") and ln.get("target"):
             out.append(Link(a_id=ln["source"], b_id=ln["target"],
                             a_port=ln.get("startPortName"), b_port=ln.get("endPortName")))
+    return out
+
+
+def interfaces_v1(http: CCHttp, device_id: str) -> list[Interface]:
+    body = http.get(f"/dna/intent/api/v1/interface/network-device/{device_id}")
+    out = []
+    for it in (body or {}).get("response") or []:
+        kbps = _int(it.get("speed"))
+        out.append(Interface(
+            device_id=device_id, name=it.get("portName") or it.get("name") or "",
+            speed_mbps=kbps // 1000 if kbps else None, duplex=it.get("duplex"), status=it.get("status"),
+            admin_status=it.get("adminStatus"), description=it.get("description")))
     return out
 
 
@@ -437,6 +449,10 @@ OPERATIONS: dict[str, list[Candidate]] = {
     "get_links": [
         Candidate("physical_topology_v1", "intent v1", "GET /dna/intent/api/v1/topology/physical-topology",
                   links_physical_topology),
+    ],
+    "get_interfaces": [
+        Candidate("interfaces_by_device_v1", "intent v1",
+                  "GET /dna/intent/api/v1/interface/network-device/{deviceId}", interfaces_v1, per_object=True),
     ],
     "get_ap_config": [
         Candidate("ap_config_summary_v1", "intent v1",
