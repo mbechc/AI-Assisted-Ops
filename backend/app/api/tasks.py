@@ -343,18 +343,67 @@ def items_kpis(db: Session = Depends(get_db), _=Depends(current_user)):
         s = by_status.get(key, Counter())
         series = history.get(key) or [0] * (KPI_DAYS * per_day + 1)
         series[-1] = s["proposed"] + s["reported"]
+        week_ago = series[-1 - 7 * per_day]
         out.append({"key": key, "name": defn.name, "category": defn.category,
                     "proposed": s["proposed"], "reported": s["reported"], "open": series[-1],
                     "approved": s["approved"] + s["executing"], "new_24h": new.get(key, 0),
                     "executed_24h": done.get(key, 0), "resolved_24h": resolved.get(key, 0),
                     "fixed_24h": done.get(key, 0) + resolved.get(key, 0),
                     "open_24h_ago": series[-1 - per_day], "change_24h": series[-1] - series[-1 - per_day],
+                    "pct_24h": _pct(series[-1], series[-1 - per_day]),
+                    "open_7d_ago": week_ago, "change_7d": series[-1] - week_ago, "pct_7d": _pct(series[-1], week_ago),
                     "history": series, "history_step_hours": KPI_STEP_HOURS})
-    return out
+    return _rank(out)
 
 
 KPI_DAYS = 30
 KPI_STEP_HOURS = 6
+KPI_TILES = 6
+MOVE_MIN = 3  # smaller changes in open items are noise, whatever the percentage
+MOVE_BASE_FLOOR = 5  # 1 -> 3 open is not a 200% event; small bases count as 5
+WEEK_WEIGHT = 0.5  # a 24-hour move outranks the same move spread over a week
+
+
+def _pct(now: int, before: int) -> int | None:
+    return round((now - before) * 100 / before) if before else None
+
+
+def _move_score(now: int, before: int) -> float:
+    delta = now - before
+    return abs(delta) / max(before, MOVE_BASE_FLOOR) if abs(delta) >= MOVE_MIN else 0.0
+
+
+def _move_reason(now: int, before: int, window: str) -> str:
+    delta = now - before
+    if before == 0:
+        return f"New: {now} open in {window}"
+    if now == 0:
+        return f"Cleared: all {before} closed in {window}"
+    return f"{'Growing' if delta > 0 else 'Declining'} {abs(round(delta * 100 / before))}% in {window}"
+
+
+def _rank(rows: list[dict]) -> list[dict]:
+    """Order the Expert Tasks for the dashboard: the biggest relative movers first, then the largest backlogs.
+
+    Only the first KPI_TILES with movement or open items become tiles; the rest are listed compactly.
+    """
+    for r in rows:
+        day = _move_score(r["open"], r["open_24h_ago"])
+        week = _move_score(r["open"], r["open_7d_ago"]) * WEEK_WEIGHT
+        r["score"] = round(max(day, week), 3)
+        if r["score"] == 0:
+            r["reason"] = "Open backlog" if r["open"] else "Quiet"
+        elif day >= week:
+            r["reason"] = _move_reason(r["open"], r["open_24h_ago"], "24 h")
+        else:
+            r["reason"] = _move_reason(r["open"], r["open_7d_ago"], "7 days")
+    rows.sort(key=lambda r: (-r["score"], -r["open"], r["name"]))
+    shown = 0
+    for i, r in enumerate(rows):
+        r["rank"] = i + 1
+        r["featured"] = shown < KPI_TILES and (r["score"] > 0 or r["open"] > 0)
+        shown += r["featured"]
+    return rows
 
 
 def _open_history(db: Session, days: int, step_hours: int) -> dict[str, list[int]]:

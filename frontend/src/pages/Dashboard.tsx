@@ -20,13 +20,30 @@ interface Kpi {
   fixed_24h: number;
   open_24h_ago: number;
   change_24h: number;
+  pct_24h: number | null;
+  open_7d_ago: number;
+  change_7d: number;
+  pct_7d: number | null;
   history: number[];
   history_step_hours: number;
+  score: number;
+  reason: string;
+  rank: number;
+  featured: boolean;
 }
 
-function trend(change: number): "better" | "worse" | "flat" {
+function trend(k: Kpi): "better" | "worse" | "flat" {
+  const change = k.change_24h || k.change_7d;
   return change < 0 ? "better" : change > 0 ? "worse" : "flat";
 }
+
+function move(change: number, pct: number | null): string {
+  if (change === 0) return "no change";
+  const sign = change > 0 ? "+" : "−";
+  return `${sign}${Math.abs(change)}${pct === null ? "" : ` (${sign}${Math.abs(pct)}%)`}`;
+}
+
+const inboxLink = (k: Kpi) => `/inbox?task=${k.key}&status=${k.reported > k.proposed ? "reported" : "proposed"}`;
 
 function Backdrop({ series }: { series: number[] }) {
   if (series.length < 2) return null;
@@ -48,6 +65,8 @@ export default function Dashboard() {
   const nav = useNavigate();
   const open = all.reduce((n, k) => n + k.open, 0);
   const change = all.reduce((n, k) => n + k.change_24h, 0);
+  const tiles = all.filter((k) => k.featured);
+  const rest = all.filter((k) => !k.featured);
 
   return (
     <>
@@ -56,18 +75,18 @@ export default function Dashboard() {
           <h1>Dashboard</h1>
           <p className="sub">
             Inbox: {open} open, {change === 0 ? "unchanged" : change < 0 ? `${-change} fewer` : `${change} more`} than
-            24 hours ago. The graph behind each category shows the last 30 days. Click a category to review it.
+            24 hours ago. The tiles are the Expert Tasks that moved most: the largest growth or decline in open items,
+            in percent over 24 hours or 7 days. The graph behind each tile shows the last 30 days.
           </p>
         </div>
         {net.data && <ConnectivityChip c={net.data} onClick={can("admin") ? () => nav("/updates") : undefined} />}
       </div>
       <ErrorLine error={kpis.error} />
       <div className="kpi-grid">
-        {all.map((k) => {
-          const t = trend(k.change_24h);
+        {tiles.map((k) => {
+          const t = trend(k);
           return (
-            <div key={k.key} className={`card kpi ${t}`} role="link" tabIndex={0}
-              onClick={() => nav(`/inbox?task=${k.key}&status=${k.reported > k.proposed ? "reported" : "proposed"}`)}
+            <div key={k.key} className={`card kpi ${t}`} role="link" tabIndex={0} onClick={() => nav(inboxLink(k))}
               onKeyDown={(e) => e.key === "Enter" && (e.currentTarget as HTMLElement).click()}>
               <Backdrop series={k.history} />
               <div className="kpi-body">
@@ -77,16 +96,35 @@ export default function Dashboard() {
                   {k.approved > 0 && <> · {k.approved} approved, executing</>}</div>
                 <div className="kpi-trend" title={`24 hours ago: ${k.open_24h_ago} open. Since then ${k.new_24h} new, ` +
                   `${k.executed_24h} executed, ${k.resolved_24h} resolved in Catalyst Center.`}>
-                  {t === "better" && <><span className="arrow">▲</span>{-k.change_24h} fewer than 24 h ago</>}
-                  {t === "worse" && <><span className="arrow">▼</span>{k.change_24h} more than 24 h ago</>}
-                  {t === "flat" && <>No change in 24 h</>}
+                  {t !== "flat" && <span className="arrow">{t === "worse" ? "▲" : "▼"}</span>}{k.reason}
                 </div>
+                <div className="kpi-moves">24 h: {move(k.change_24h, k.pct_24h)} · 7 days: {move(k.change_7d, k.pct_7d)}</div>
               </div>
             </div>
           );
         })}
       </div>
-      {kpis.data && !all.length && <p className="muted">No review categories.</p>}
+      {rest.length > 0 && (
+        <div className="card" style={{ marginTop: 16 }}>
+          <h2 style={{ marginTop: 0 }}>Other Expert Tasks</h2>
+          <p className="small muted">Less movement than the tiles above.</p>
+          <table>
+            <thead><tr><th>Expert Task</th><th className="num">Open</th><th className="num">24 h</th>
+              <th className="num">7 days</th><th>Status</th></tr></thead>
+            <tbody>
+              {rest.map((k) => (
+                <tr key={k.key} className="click" onClick={() => nav(inboxLink(k))}>
+                  <td>{k.name}</td><td className="num">{k.open}</td>
+                  <td className="num">{move(k.change_24h, k.pct_24h)}</td>
+                  <td className="num">{move(k.change_7d, k.pct_7d)}</td>
+                  <td className="muted">{k.reason}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      {kpis.data && !all.length && <p className="muted">No Expert Tasks.</p>}
       <ShiftCard />
     </>
   );

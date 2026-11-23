@@ -117,6 +117,7 @@ pre { background: var(--input-bg); border: 1px solid var(--border); border-radiu
 .kpi-label { color: var(--muted); font-size: 12px; margin-bottom: 12px; }
 .kpi-trend { font-size: 13px; font-weight: 600; color: var(--trend); }
 .kpi-trend .arrow { margin-right: 5px; font-size: 11px; }
+.kpi-moves { color: var(--muted); font-size: 12px; margin-top: 4px; }
 .stat .v { font-size: 26px; font-weight: 600; }
 .stat .l { color: var(--muted); font-size: 12px; }
 

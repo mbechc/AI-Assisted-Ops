@@ -19,8 +19,9 @@ assurance, maps and reports. AIOps works through that backlog continuously.
   choose a local LLM (Ollama, CPU only, nothing leaves the host) or Azure OpenAI in your own tenant.
 - **Safe change path.** Every change goes through the Catalyst Center API. Nothing connects to WLCs, APs
   or switches directly (no SSH, NETCONF or Command Runner).
-- **Accountable.** Every approval, change, setting and log view is in the audit log; the Inbox
-  dashboard shows the trend per category over 30 days.
+- **Accountable.** Every approval, change, setting and log view is in the audit log; the Dashboard
+  shows the up to 6 Expert Tasks with the largest growth or decline in open items (percent over 24 hours
+  or 7 days), each with its 30-day trend.
 - **Isolated workers.** Each domain runs in its own container and queue, so one runaway task cannot stall
   the others.
 

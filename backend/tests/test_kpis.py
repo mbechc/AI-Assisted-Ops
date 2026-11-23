@@ -43,3 +43,36 @@ def test_review_kpis_per_category():
     assert rows["device_role_correction"]["history"] == [0] * (30 * 4 + 1)
     d = rows["site_hierarchy_drift"]
     assert (d["open"], d["reported"], d["new_24h"]) == (1, 1, 1)
+
+
+def test_dashboard_ranking_by_relative_movement():
+    from app.api.tasks import KPI_TILES, _rank
+
+    def row(name, now, day_ago, week_ago=None):
+        return {"key": name, "name": name, "open": now, "open_24h_ago": day_ago,
+                "open_7d_ago": day_ago if week_ago is None else week_ago}
+
+    rows = _rank([
+        row("big_backlog_flat", 900, 900),
+        row("doubled", 40, 20),             # +100% in 24 h
+        row("tiny_noise", 2, 1),            # +100% but only one item: noise
+        row("halved", 50, 100),             # -50% in 24 h
+        row("slow_week", 130, 128, 100),    # +30% in 7 days, weighted half
+        row("new", 12, 0),
+        row("cleared", 0, 8),
+        row("quiet_a", 0, 0), row("quiet_b", 0, 0),
+        row("small_backlog", 4, 4),
+    ])
+    order = [r["key"] for r in rows]
+    by = {r["key"]: r for r in rows}
+    assert order[:5] == ["new", "doubled", "cleared", "halved", "slow_week"]  # ties: more open first
+    assert by["new"]["reason"] == "New: 12 open in 24 h"
+    assert by["cleared"]["reason"] == "Cleared: all 8 closed in 24 h"
+    assert by["doubled"]["reason"] == "Growing 100% in 24 h"
+    assert by["halved"]["reason"] == "Declining 50% in 24 h"
+    assert by["slow_week"]["reason"] == "Growing 30% in 7 days"
+    assert by["tiny_noise"]["score"] == 0
+    assert by["big_backlog_flat"]["reason"] == "Open backlog"
+    featured = [r["key"] for r in rows if r["featured"]]
+    assert len(featured) == KPI_TILES and featured[5] == "big_backlog_flat"
+    assert not by["quiet_a"]["featured"] and by["quiet_a"]["reason"] == "Quiet"

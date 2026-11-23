@@ -140,7 +140,7 @@ function GroupsView({ groups, taskName, sourceName, showSource, onOpen }: {
       <table>
         <thead>
           <tr>
-            <th>Group</th>{showTask && <th>Task</th>}{showSource && <th>Catalyst Center</th>}
+            <th>Group</th>{showTask && <th>Expert Task</th>}{showSource && <th>Catalyst Center</th>}
             <th className="num">Items</th><th className="num">Avg conf.</th>
           </tr>
         </thead>
@@ -199,7 +199,7 @@ function ItemsTable({ items, selected, setSelected, onOpen, taskName, sourceName
       <thead>
         <tr>
           {selectable && <th><input type="checkbox" checked={allSel} onChange={() => setSelected(allSel ? new Set() : new Set(open.map((i) => i.id)))} /></th>}
-          <th>Target</th>{showTask && <th>Task</th>}{showSource && <th>Catalyst Center</th>}
+          <th>Target</th>{showTask && <th>Expert Task</th>}{showSource && <th>Catalyst Center</th>}
           <th>Proposal</th><th>Confidence</th><th>Status</th><th>Notes</th><th>Updated</th>
         </tr>
       </thead>

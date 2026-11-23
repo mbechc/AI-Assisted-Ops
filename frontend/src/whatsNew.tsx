@@ -20,6 +20,8 @@ export const CHANGES: Change[] = [
   { id: "2026.11-automation", path: "/automation", admin: true, text: "New page: the kill switch and the global autonomy cap, moved here from Settings." },
   { id: "2026.11-ai", path: "/ai", admin: true, text: "New page: AI assistance, moved here from Settings." },
   { id: "2026.11-updates", path: "/updates", admin: true, text: "New page: Updates, moved here from Settings. Versions now follow the calendar: year.month.revision." },
+  { id: "2026.11-dashboard-movers", path: "/", text: "The Dashboard shows up to 6 tiles: the Expert Tasks with the largest growth or decline in open items. The rest are listed below." },
+  { id: "2026.11-filter-expert-task", path: "/inbox", text: "The Task filter is now called Expert Task." },
   { id: "2026.11-ap-uplink", path: "/tasks", admin: true, text: "New Expert Task: AP uplink health finds APs on half duplex or 100 Mbit switch ports (report only)." },
   { id: "2026.11-users-delete", path: "/users", admin: true, text: "Users can now be deleted. Their decisions and audit entries keep the name." },
 ];

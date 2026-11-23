@@ -23,7 +23,7 @@ export const ATTRS: { attr: Attr; label: string; ops: OpDef[] }[] = [
     { op: "is", label: "is", urlKey: "source", apiKey: "source_id", kind: "multi" },
     { op: "not", label: "is not", urlKey: "source.not", apiKey: "source_id_not", kind: "multi" },
   ] },
-  { attr: "task", label: "Task", ops: [
+  { attr: "task", label: "Expert Task", ops: [
     { op: "is", label: "is", urlKey: "task", apiKey: "task_key", kind: "multi" },
     { op: "not", label: "is not", urlKey: "task.not", apiKey: "task_key_not", kind: "multi" },
   ] },
