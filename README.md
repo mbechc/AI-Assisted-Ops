@@ -201,7 +201,9 @@ same version or newer; older versions are never offered.
 Installing an update runs on the host: the release is downloaded and its checksum verified, a backup is
 taken (database, `.env`, certificates), the changed image layers are pulled from ghcr.io (each service is
 its own image, and unchanged layers are not downloaded again), migrations run and services restart. The
-log is shown live in the portal.
+log is shown live in the portal. Open browser tabs reload by themselves when the server runs a newer
+version than the tab (checked when the API comes back after the restart, and every minute), so nobody keeps
+working in the old UI. Tabs opened before 2026.11.1-dev.3 need one manual reload.
 
 Updates are online only. The host must reach:
 

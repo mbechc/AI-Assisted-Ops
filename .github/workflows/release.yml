@@ -33,6 +33,11 @@ jobs:
             echo "::error::tag $GITHUB_REF_NAME does not match VERSION ($file)"
             exit 1
           fi
+          ui="$(python3 -c 'import json; print(json.load(open("frontend/package.json"))["version"])')"
+          if [ "$ui" != "$file" ]; then
+            echo "::error::frontend/package.json version $ui does not match VERSION ($file): browser tabs compare it with the server version to reload after an update"
+            exit 1
+          fi
           case "$tag" in *-*) pre=true ;; *) pre=false ;; esac
           owner="$(echo "$GITHUB_REPOSITORY_OWNER" | tr '[:upper:]' '[:lower:]')"
           {

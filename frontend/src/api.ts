@@ -36,12 +36,29 @@ function markOnline() {
   }
 }
 
+export const APP_VERSION = __APP_VERSION__;
+const VERSION_CHECK_MS = 60000;
+const RELOADED_FOR = "aiops-reloaded-for";
+
+/** After an update the server runs a newer version than this tab: reload once to load the new UI. */
+function checkVersion(server: unknown) {
+  if (typeof server !== "string" || !server || server === APP_VERSION) return;
+  if (sessionStorage.getItem(RELOADED_FOR) === server) return; // the reload did not bring the new UI; avoid a loop
+  sessionStorage.setItem(RELOADED_FOR, server);
+  window.location.reload();
+}
+
+/** Starts the periodic version check; the offline probe checks too, so a reload follows the update restart. */
+export function watchVersion() {
+  window.setInterval(() => { if (online) probe(); }, VERSION_CHECK_MS);
+}
+
 /** Checks whether the API answers again; called on a timer while offline and by "Retry now". */
 export async function probe(): Promise<boolean> {
   try {
     const res = await fetch("/api/health", { cache: "no-store", credentials: "same-origin" });
     if (res.ok && (res.headers.get("content-type") || "").includes("json")) {
-      await res.json();
+      checkVersion((await res.json())?.version);
       markOnline();
       return true;
     }
