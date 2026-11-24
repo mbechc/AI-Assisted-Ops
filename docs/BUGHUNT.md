@@ -12,7 +12,7 @@ Status: **open**, **fixed in &lt;version&gt;** or **won't fix**.
 | 3 | Wrong-site detection | Run 27 failed with a database error: two tasks wrote the same cache entry at the same time (`duplicate key ... cache_entries_pkey`) | fixed in 0.2.5-dev.4 |
 | 4 | Installer | Redis warns at every start that memory overcommit is disabled (`vm.overcommit_memory`) | fixed in 0.2.5-dev.4 |
 | 5 | Workers | worker-inventory restarted on 19 Nov 16:22 while a run was active (run marked failed as orphaned); cause unknown | open, needs info |
-| 6 | UI | Sidebar subtitle "Catalyst Center operations assistant" should read "IT Operations Assistant": AIOps will cover more products than Catalyst Center | fixed in 0.2.5-dev.7 |
+| 6 | UI | Sidebar subtitle "Catalyst Center operations assistant" should read "IT Operations Assistant": Steward will cover more products than Catalyst Center | fixed in 0.2.5-dev.7 |
 | 7 | Inbox | The "By group" table looks cluttered: remove the ">= Threshold" and "Need choice" columns and the per-group Approve button | fixed in 0.2.5-dev.7 |
 | 8 | Expert Tasks | The category cards (Collector, Wireless / Inventory hygiene, ...) are always fully open, which makes the page hard to overview: collapse them to their headline and expand one at a time | fixed in 0.2.5-dev.8 |
 | 9 | Configure | Settings was a mixed bag: split into Automation (kill switch, global autonomy cap), AI assistance and Updates under Configure | fixed in 2026.11.0-dev.1 |
@@ -34,7 +34,7 @@ Likely fix: `name="username"` with `autoComplete="username"` on the username fie
 in Safari and Chrome that saving and filling work.
 
 Related: the Catalyst Center password on **Data sources** and the user password on **Users** should get
-`autoComplete="new-password"`, so the browser does not fill in the AIOps login there.
+`autoComplete="new-password"`, so the browser does not fill in the Steward login there.
 
 ### 2. Tracebacks shown to users
 
@@ -67,7 +67,7 @@ test with two sessions writing the same key.
 Redis logs `WARNING Memory overcommit must be enabled!` at every start. Without it a background save can
 fail under memory pressure.
 
-Likely fix: the installer writes `vm.overcommit_memory = 1` to `/etc/sysctl.d/90-aiops.conf` and applies it
+Likely fix: the installer writes `vm.overcommit_memory = 1` to `/etc/sysctl.d/90-steward.conf` and applies it
 with `sysctl --system` (it is a host kernel setting; a container cannot set it). Mention it in the README
 and in `uninstall.sh --purge`.
 
@@ -76,12 +76,12 @@ and in `uninstall.sh --purge`.
 On 19 Nov at 16:22 worker-inventory started, found a run that was still marked running and marked it as
 failed (`marked 1 orphaned run(s)`). That is the intended recovery; the open question is why the worker
 restarted. If nobody restarted or updated the appliance at that time, check for an out-of-memory kill:
-`docker inspect aiops-worker-inventory-1 --format '{{.State.OOMKilled}} {{.RestartCount}}'` and
+`docker inspect steward-worker-inventory-1 --format '{{.State.OOMKilled}} {{.RestartCount}}'` and
 `journalctl -k | grep -i oom`.
 
 ### 6. Sidebar subtitle
 
-The subtitle under the AIOps logo (`frontend/src/App.tsx`, the `brand` block) says "Catalyst Center operations
+The subtitle under the Steward logo (`frontend/src/App.tsx`, the `brand` block) says "Catalyst Center operations
 assistant". Rename it to "IT Operations Assistant", since later releases will support more products than
 Catalyst Center. It is the only place the text appears.
 

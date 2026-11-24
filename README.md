@@ -1,7 +1,5 @@
 # Steward: AI-assisted operations for Cisco Catalyst Center
 
-*Formerly AIOps.*
-
 > **Not a Cisco product.** Steward is an independent, personal open-source project. It is not affiliated
 > with, endorsed by or supported by Cisco, and it is provided as is, without warranty or liability
 > ([terms](DISCLAIMER.md), Apache License 2.0). The installer asks you to accept the terms.
@@ -118,11 +116,6 @@ It finds the newest Production release on GitHub, verifies its checksum, install
 pulls the prebuilt images from ghcr.io, initialises the database, creates the `admin` user and runs a
 self-test. No LLM is downloaded: the appliance starts in No AI mode. At the end it prints the portal URL and the admin password (also stored
 in `/opt/Steward/initial-admin-password.txt`; delete it after the first login).
-
-**Moving from AIOps.** Steward is the renamed AIOps and has no in-place upgrade from it. On a host that
-runs AIOps, remove it first with `sudo /opt/AIOps/scripts/uninstall.sh --purge` (this deletes its data),
-then install Steward with the command above. Devices that AIOps excluded with the `AIOPS-EXCLUDED` tag are
-still recognised, so Steward can include them again.
 
 Options go after `bash -s --`:
 

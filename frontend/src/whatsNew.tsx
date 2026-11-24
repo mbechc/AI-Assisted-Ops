@@ -15,7 +15,6 @@ export interface Change {
 export const CHANGES: Change[] = [
   { id: "2026.11-read-only", path: "/sources", admin: true, text: "Read-only assessment: give a data source a Catalyst Center user with OBSERVER-ROLE and Catalyst Center refuses every change. Refused changes are shown on the source and on the item." },
   { id: "2026.11-four-tasks", path: "/tasks", admin: true, text: "Four new Expert Tasks: AP power shortfall and Repeat err-disabled ports (report only), Unsaved configuration (saves the running configuration) and Stale inventory (deletes long-unreachable devices, always with approval)." },
-  { id: "2026.11-steward", path: "/", text: "AIOps is now called Steward." },
   { id: "2026.11-history", path: "/history", text: "Activity is now called History: everything that was decided or automated." },
   { id: "2026.11-task-history", path: "/runs", text: "Run history is now called Expert Task history." },
   { id: "2026.11-inbox-groups", path: "/inbox", text: "The By group table is simpler. Bulk approve and reject are in the Items tab." },
