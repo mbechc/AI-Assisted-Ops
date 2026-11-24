@@ -1,4 +1,4 @@
-import { KeyboardEvent, ReactNode, useEffect, useRef, useState } from "react";
+import { KeyboardEvent, ReactNode, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { api } from "./api";
 import { useAsync } from "./components";
 import {
@@ -19,6 +19,18 @@ function useOutside(ref: React.RefObject<HTMLElement | null>, onOutside: () => v
     document.addEventListener("mousedown", h);
     return () => document.removeEventListener("mousedown", h);
   }, [active, onOutside, ref]);
+}
+
+/** Content-wide menus open to the left when they would run past the right edge of the window. */
+function useFitMenu(open: boolean) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [right, setRight] = useState(false);
+  useLayoutEffect(() => {
+    if (!open) return setRight(false);
+    const r = ref.current?.getBoundingClientRect();
+    if (r && r.right > window.innerWidth - 16) setRight(true);
+  }, [open]);
+  return { ref, right };
 }
 
 /** Value lists (with counts) and display names for each attribute. */
@@ -200,6 +212,7 @@ function MultiSelect({ options, values, onChange }: { options: Option[]; values:
   const ref = useRef<HTMLDivElement>(null);
   useOutside(ref, () => setOpen(false), open);
   const shown = options.filter((o) => o.label.toLowerCase().includes(find.toLowerCase()));
+  const menu = useFitMenu(open);
   const toggle = (v: string) => onChange(values.includes(v) ? values.filter((x) => x !== v) : [...values, v]);
   const summary = !values.length ? "Select value"
     : values.length <= 2 ? values.map((v) => options.find((o) => o.value === v)?.label || v).join(", ")
@@ -211,13 +224,13 @@ function MultiSelect({ options, values, onChange }: { options: Option[]; values:
         <span>{summary}</span><span className="chev" aria-hidden>{open ? "\u25B4" : "\u25BE"}</span>
       </button>
       {open && (
-        <div className="dropdown-menu ms-menu">
+        <div className={`dropdown-menu ms-menu ${menu.right ? "right" : ""}`} ref={menu.ref}>
           {options.length > 8 && <input autoFocus placeholder="Find" value={find} onChange={(e) => setFind(e.target.value)} />}
           <div className="ms-list">
             {shown.map((o) => (
               <label key={o.value} className={`ms-option ${o.count === 0 ? "empty" : ""}`}>
                 <input type="checkbox" checked={values.includes(o.value)} onChange={() => toggle(o.value)} />
-                <span className="ms-label">{o.label}</span>
+                <span className="ms-label" title={o.label}>{o.label}</span>
                 {o.count !== undefined && <span className="ms-count">{o.count.toLocaleString()}</span>}
               </label>
             ))}
