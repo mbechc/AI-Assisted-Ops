@@ -167,7 +167,7 @@ task run uses the new mode.
 
 - **Local LLM**: confirm, and the host updater starts the Ollama container and downloads the model
   (about 5 GB, from `registry.ollama.ai`). The section shows the progress and log; until the model is
-  ready the tasks keep running without AI. **Remove model** stops the container and deletes the model;
+  ready the tasks keep running without AI. **Remove model** stops the container and deletes the model and the Ollama image;
   switching to another mode stops it and optionally deletes it. From the shell:
   `sudo /opt/Steward/scripts/update.sh --llm enable|disable|remove`. Air-gapped: put an
   `ollama-models.tgz` (from `scripts/export-bundle.sh` on a host that has the model) in

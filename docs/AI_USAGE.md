@@ -48,7 +48,7 @@ host updater (the same root-owned systemd service that installs updates) to:
 3. report progress and a log back to the AI assistance page.
 
 Until the model is ready, tasks keep running without AI. **Remove model** (or leaving Local LLM with
-*delete model* ticked) stops the container and deletes the model; without the tick the model is kept for
+*delete model* ticked) stops the container and deletes the model and the Ollama image (about 8.5 GB); without the tick the model is kept for
 a quick switch back. Updates keep the LLM if it is enabled and never install it if it is not.
 
 ### Azure OpenAI

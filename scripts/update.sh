@@ -310,8 +310,11 @@ llm_disable() {
   if [ "${1:-}" = remove ]; then
     docker volume rm -f "$(project_name)_ollama" >/dev/null 2>&1 || true
     rm -f "$INSTALL_DIR/data/llm/ollama-models.tgz"
+    ids="$(docker image ls -q ollama/ollama 2>/dev/null | sort -u)"
+    # shellcheck disable=SC2086
+    [ -n "$ids" ] && { docker image rm -f $ids >/dev/null 2>&1 || true; }
     llm_state removed
-    log "local LLM removed (container and model)"
+    log "local LLM removed (container, model and image)"
   else
     llm_state disabled
     log "local LLM disabled (model kept)"
