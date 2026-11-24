@@ -12,6 +12,7 @@ DEFAULT_SETTINGS: dict[str, Any] = {
     "kill_switch": False,
     "global_autonomy_cap": 1,
     "ai_mode": "none",
+    "announcement": "",
 }
 # Stored like DEFAULT_SETTINGS but not part of GET /settings (secrets live here, encrypted).
 PRIVATE_DEFAULTS: dict[str, Any] = {

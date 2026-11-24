@@ -34,9 +34,13 @@ class UserPatch(BaseModel):
     password: str | None = None
 
 
+ANNOUNCEMENT_MAX = 500
+
+
 class SettingsIn(BaseModel):
     kill_switch: bool | None = None
     global_autonomy_cap: int | None = None
+    announcement: str | None = None
 
 
 @router.get("/users")
@@ -127,6 +131,11 @@ def put_settings(body: SettingsIn, db: Session = Depends(get_db), admin: User = 
         set_setting(db, "global_autonomy_cap", body.global_autonomy_cap)
     if body.kill_switch is not None:
         set_setting(db, "kill_switch", body.kill_switch)
+    if body.announcement is not None:
+        body.announcement = body.announcement.strip()
+        if len(body.announcement) > ANNOUNCEMENT_MAX:
+            raise HTTPException(400, f"the message can be at most {ANNOUNCEMENT_MAX} characters")
+        set_setting(db, "announcement", body.announcement)
     after = {**before, **body.model_dump(exclude_none=True)}
     if after["kill_switch"] or after["global_autonomy_cap"] < before["global_autonomy_cap"]:
         revoke_open_auto_items(db)

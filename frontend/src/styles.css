@@ -46,7 +46,9 @@ code, pre { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospac
 pre { background: var(--input-bg); border: 1px solid var(--border); border-radius: 6px; padding: 10px; overflow: auto; max-height: 480px; white-space: pre-wrap; }
 
 .layout { display: flex; min-height: 100vh; }
-.sidebar { width: 220px; background: var(--panel); border-right: 1px solid var(--border); padding: 16px 0; flex-shrink: 0; display: flex; flex-direction: column; }
+.sidebar { width: 220px; background: var(--panel); border-right: 1px solid var(--border); padding: 16px 0; flex-shrink: 0; display: flex; flex-direction: column;
+  position: sticky; top: 0; height: 100vh; z-index: 25; }
+.nav { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .brand { padding: 0 18px 16px; font-weight: 700; font-size: 16px; letter-spacing: .02em; }
 .brand small { display: block; color: var(--muted); font-weight: 400; font-size: 11px; margin-top: 2px; }
 .nav a { display: flex; justify-content: space-between; align-items: center; padding: 8px 18px; color: var(--text); border-left: 3px solid transparent; }
@@ -60,10 +62,12 @@ pre { background: var(--input-bg); border: 1px solid var(--border); border-radiu
 .nav-parent:hover, .nav-parent.open { background: var(--panel-2); }
 .nav-parent.active { border-left-color: var(--accent); font-weight: 600; }
 .nav-parent .chev { color: var(--muted); font-size: 16px; line-height: 1; }
-.nav-flyout { position: absolute; left: 100%; top: -8px; z-index: 30; min-width: 220px; background: var(--panel);
+.nav-flyout { position: fixed; z-index: 40; min-width: 220px; background: var(--panel);
   border: 1px solid var(--border); border-radius: 0 8px 8px 0; box-shadow: 0 8px 24px rgba(0, 0, 0, .25); padding: 6px 0 8px; }
 .nav-flyout-head { padding: 8px 18px 10px; margin-bottom: 4px; border-bottom: 1px solid var(--border); font-weight: 700; font-size: 15px; }
 .nav .count { background: var(--accent-2); color: #fff; border-radius: 10px; padding: 0 7px; font-size: 11px; }
+.sidebar-notice { margin: 8px 10px; padding: 8px 10px; background: var(--panel-2); border: 1px solid var(--border); border-radius: 6px;
+  font-size: 12px; line-height: 1.4; color: var(--text); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 35vh; overflow-y: auto; flex-shrink: 0; }
 .sidebar .foot { margin-top: auto; padding: 8px; border-top: 1px solid var(--border); position: relative; }
 .user-btn { display: flex; align-items: center; gap: 10px; width: 100%; background: none; border: 1px solid transparent; padding: 6px 8px; text-align: left; }
 .user-btn:hover:not(:disabled), .user-btn.open { background: var(--panel-2); border-color: var(--border); }
@@ -169,9 +173,9 @@ label.check { display: flex; gap: 6px; align-items: center; }
 .level.capped { opacity: .35; cursor: not-allowed; }
 .level b { display: block; font-size: 13px; margin-bottom: 2px; }
 
-.drawer-bg { position: fixed; inset: 0; background: rgba(0, 0, 0, .5); z-index: 10; }
-.drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(760px, 95vw); background: var(--panel); border-left: 1px solid var(--border); z-index: 11; overflow: auto; padding: 20px 22px; }
-.modal { position: fixed; top: 8vh; left: 50%; transform: translateX(-50%); width: min(620px, 95vw); max-height: 84vh; overflow: auto; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; z-index: 11; padding: 20px; }
+.drawer-bg { position: fixed; inset: 0; background: rgba(0, 0, 0, .5); z-index: 50; }
+.drawer { position: fixed; top: 0; right: 0; bottom: 0; width: min(760px, 95vw); background: var(--panel); border-left: 1px solid var(--border); z-index: 51; overflow: auto; padding: 20px 22px; }
+.modal { position: fixed; top: 8vh; left: 50%; transform: translateX(-50%); width: min(620px, 95vw); max-height: 84vh; overflow: auto; background: var(--panel); border: 1px solid var(--border); border-radius: 10px; z-index: 51; padding: 20px; }
 
 .evidence { border: 1px solid var(--border); border-radius: 6px; padding: 10px; margin-bottom: 8px; background: var(--panel-2); }
 .evidence.agree { border-left: 3px solid var(--ok); }

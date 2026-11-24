@@ -13,6 +13,7 @@ export interface Change {
 
 // Every entry shows a dot to each user who has not opened the page since, so drop entries after a few releases.
 export const CHANGES: Change[] = [
+  { id: "2026.11-announcement", path: "/announcement", admin: true, text: "New page: Announcement. Post a short message that every user sees in the sidebar. The sidebar now stays in place when you scroll." },
   { id: "2026.11-read-only", path: "/sources", admin: true, text: "Read-only assessment: give a data source a Catalyst Center user with OBSERVER-ROLE and Catalyst Center refuses every change. Refused changes are shown on the source and on the item." },
   { id: "2026.11-four-tasks", path: "/tasks", admin: true, text: "Four new Expert Tasks: AP power shortfall and Repeat err-disabled ports (report only), Unsaved configuration (saves the running configuration) and Stale inventory (deletes long-unreachable devices, always with approval)." },
   { id: "2026.11-history", path: "/history", text: "Activity is now called History: everything that was decided or automated." },

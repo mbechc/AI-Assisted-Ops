@@ -89,3 +89,23 @@ def test_geoip_upload_api(tmp_path, monkeypatch):
     assert t["status"] == "ok"
     assert not [f for f in os.listdir(os.path.join(str(tmp_path), str(src["id"]))) if f.endswith(".upload")]
     db.close()
+
+
+def test_announcement_setting():
+    from app.models import AuditLog
+    c, db = _client()
+    assert c.get("/api/settings").json()["announcement"] == ""
+    r = c.put("/api/settings", json={"announcement": "  Change freeze until Monday.\nCall NOC for exceptions.  "})
+    assert r.status_code == 200 and r.json()["announcement"] == "Change freeze until Monday.\nCall NOC for exceptions."
+    assert r.json()["kill_switch"] is False, "other settings are untouched"
+    assert c.put("/api/settings", json={"announcement": "x" * 501}).status_code == 400
+    assert c.get("/api/settings").json()["announcement"].startswith("Change freeze")
+    entry = db.query(AuditLog).filter_by(action="settings.updated").one()
+    assert entry.details["after"]["announcement"].startswith("Change freeze")
+    assert c.put("/api/settings", json={"announcement": ""}).json()["announcement"] == ""
+    db.close()
+
+    c, db = _client(role="viewer")
+    assert c.get("/api/settings").json()["announcement"] == ""
+    assert c.put("/api/settings", json={"announcement": "hi"}).status_code == 403
+    db.close()

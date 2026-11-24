@@ -3,7 +3,7 @@ import { useAuth } from "../App";
 import { api } from "../api";
 import { ErrorLine, Level, useAsync } from "../components";
 
-interface GlobalSettings { kill_switch: boolean; global_autonomy_cap: number }
+interface GlobalSettings { kill_switch: boolean; global_autonomy_cap: number; announcement: string }
 
 const CAP_TEXT = ["Report only everywhere", "Human review everywhere", "Auto above threshold allowed", "Full autonomy allowed"];
 

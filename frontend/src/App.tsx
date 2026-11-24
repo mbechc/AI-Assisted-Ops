@@ -1,4 +1,4 @@
-import { createContext, ReactNode, useContext, useEffect, useRef, useState } from "react";
+import { createContext, ReactNode, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
 import { api, ConnectionError, isOnline, LOST_CONNECTION, probe, TERMS_URL, TermsRecord } from "./api";
 import { useAsync } from "./components";
@@ -18,6 +18,7 @@ import Sources from "./pages/Sources";
 import GeoipSource from "./pages/GeoipSource";
 import Audit from "./pages/Audit";
 import Users from "./pages/Users";
+import Announcement from "./pages/Announcement";
 import Automation from "./pages/Automation";
 import AiAssistance from "./pages/AiAssistance";
 import Updates from "./pages/Updates";
@@ -146,7 +147,12 @@ function ShellBody() {
   const { can } = useAuth();
   const { hasNew } = useNews();
   const { data: summary } = useAsync(() => api.get<Record<string, Record<string, number>>>("/items/summary"), [], 30000);
-  const { data: settings } = useAsync(() => api.get<{ kill_switch: boolean; global_autonomy_cap: number }>("/settings"), [], 30000);
+  const { data: settings, reload: reloadSettings } = useAsync(
+    () => api.get<{ kill_switch: boolean; global_autonomy_cap: number; announcement: string }>("/settings"), [], 30000);
+  useEffect(() => {
+    window.addEventListener("steward:settings", reloadSettings);
+    return () => window.removeEventListener("steward:settings", reloadSettings);
+  }, [reloadSettings]);
   const { data: terms } = useAsync(() => api.get<TermsRecord>("/terms"), [], 300000);
   const pending = Object.values(summary || {}).reduce((n, s) => n + (s.proposed || 0), 0);
 
@@ -180,9 +186,11 @@ function ShellBody() {
               <Item to="/ai">AI assistance</Item>
               <Item to="/updates">Updates</Item>
               <Item to="/users">Users</Item>
+              <Item to="/announcement">Announcement</Item>
             </NavFlyout>
           )}
         </nav>
+        {settings?.announcement && <div className="sidebar-notice" role="note">{settings.announcement}</div>}
         <UserMenu />
       </aside>
       <main className="main">
@@ -214,6 +222,7 @@ function ShellBody() {
           <Route path="/sources/:id/geoip" element={<Admin><GeoipSource /></Admin>} />
           <Route path="/audit" element={<Admin><Audit /></Admin>} />
           <Route path="/users" element={<Admin><Users /></Admin>} />
+          <Route path="/announcement" element={<Admin><Announcement /></Admin>} />
           <Route path="/automation" element={<Admin><Automation /></Admin>} />
           <Route path="/ai" element={<Admin><AiAssistance /></Admin>} />
           <Route path="/updates" element={<Admin><Updates /></Admin>} />
@@ -225,7 +234,7 @@ function ShellBody() {
   );
 }
 
-const CONFIGURE = ["/tasks", "/sources", "/automation", "/ai", "/updates", "/users"];
+const CONFIGURE = ["/tasks", "/sources", "/automation", "/ai", "/updates", "/users", "/announcement"];
 const OBSERVE = ["/runs", "/runners", "/logs", "/audit"];
 
 function Admin({ children }: { children: ReactNode }) {
@@ -263,8 +272,29 @@ function NavFlyout({ title, paths, children }: { title: string; paths: string[];
   };
   useEffect(() => setOpen(false), [pathname]);
   useEffect(() => () => window.clearTimeout(timer.current), []);
+  const wrap = useRef<HTMLDivElement>(null);
+  const panel = useRef<HTMLDivElement>(null);
+  const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  useLayoutEffect(() => {
+    if (!open) return setPos(null);
+    const row = wrap.current?.getBoundingClientRect();
+    if (!row) return;
+    const height = panel.current?.offsetHeight || 0;
+    setPos({ left: row.right, top: Math.max(8, Math.min(row.top - 8, window.innerHeight - height - 8)) });
+  }, [open]);
+  useEffect(() => {
+    if (!open) return;
+    const close = () => setOpen(false);
+    const nav = wrap.current?.closest(".nav");
+    window.addEventListener("resize", close);
+    nav?.addEventListener("scroll", close, { passive: true });
+    return () => {
+      window.removeEventListener("resize", close);
+      nav?.removeEventListener("scroll", close);
+    };
+  }, [open]);
   return (
-    <div className="nav-flyout-wrap" onMouseEnter={show} onMouseLeave={hide}
+    <div className="nav-flyout-wrap" ref={wrap} onMouseEnter={show} onMouseLeave={hide}
       onBlur={(e) => { if (!e.currentTarget.contains(e.relatedTarget as Node | null)) hide(); }}
       onKeyDown={(e) => { if (e.key === "Escape") setOpen(false); }}>
       <button className={`nav-parent ${here ? "active" : ""} ${open ? "open" : ""}`} aria-haspopup="true" aria-expanded={open}
@@ -272,7 +302,7 @@ function NavFlyout({ title, paths, children }: { title: string; paths: string[];
         <span>{title}{hasNew(...paths) && <NewDot />}</span><span className="chev" aria-hidden>{"\u203A"}</span>
       </button>
       {open && (
-        <div className="nav-flyout" onClick={(e) => { if ((e.target as HTMLElement).closest("a")) setOpen(false); }}>
+        <div className="nav-flyout" ref={panel} style={pos ? { top: pos.top, left: pos.left } : { visibility: "hidden" }} onClick={(e) => { if ((e.target as HTMLElement).closest("a")) setOpen(false); }}>
           <div className="nav-flyout-head">{title}</div>
           {children}
         </div>
