@@ -4,6 +4,7 @@ data/
 backups/
 dist/
 initial-admin-password.txt
+demo-invitationer.md
 node_modules/
 frontend/dist/
 __pycache__/

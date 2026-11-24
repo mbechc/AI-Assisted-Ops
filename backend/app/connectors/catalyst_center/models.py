@@ -63,6 +63,26 @@ class Interface:
 
 
 @dataclass
+class PoePort:
+    device_id: str
+    name: str
+    oper_status: str | None = None  # ON | OFF | FAULTY | POWER_DENY
+    admin_status: str | None = None
+    max_w: float | None = None
+    allocated_w: float | None = None
+    drawn_w: float | None = None
+    pd_model: str | None = None
+    pd_class: str | None = None
+
+
+@dataclass
+class ComplianceRow:
+    device_id: str
+    status: str  # COMPLIANT | NON_COMPLIANT | ...
+    last_change_ms: int | None = None
+
+
+@dataclass
 class ApConfig:
     ap_id: str
     location: str | None = None

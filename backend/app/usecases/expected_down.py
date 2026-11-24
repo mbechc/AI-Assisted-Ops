@@ -14,19 +14,7 @@ from app.framework.base import AnalysisResult, ExecResult, ParamSpec, Proposal, 
 from app.framework.registry import register
 from app.inventory import ensure_fresh, history, is_unreachable
 from app.models import WorkItem
-from app.usecases.common import fail_all, open_targets
-
-
-def _aware(dt: datetime | None) -> datetime | None:
-    if dt is not None and dt.tzinfo is None:
-        return dt.replace(tzinfo=timezone.utc)
-    return dt
-
-
-def _split(v) -> list[str]:
-    if isinstance(v, list):
-        return [x.strip() for x in v if str(x).strip()]
-    return [x.strip() for x in str(v or "").split(",") if x.strip()]
+from app.usecases.common import aware, fail_all, open_targets, split_list
 
 
 EXCLUSION_TAG = "STEWARD-EXCLUDED"
@@ -93,8 +81,8 @@ class ExpectedDown(TaskDefinition):
             excluded = {}
         ctx.log(f"Currently excluded: {len(excluded)} device(s)")
 
-        site_paths = [x.lower() for x in _split(p.get("expected_down_site_paths"))]
-        prefixes = [x.lower() for x in _split(p.get("expected_down_hostname_prefixes"))]
+        site_paths = [x.lower() for x in split_list(p.get("expected_down_site_paths"))]
+        prefixes = [x.lower() for x in split_list(p.get("expected_down_hostname_prefixes"))]
         flap_since = now - timedelta(hours=int(p.get("flap_window_hours", 48)))
         flaps = history(ctx.db, ctx.source.id, "reachability", flap_since)
         stable_since = now - timedelta(hours=int(p.get("stable_hours", 24)))
@@ -118,8 +106,8 @@ class ExpectedDown(TaskDefinition):
                 continue
             reasons, conf = [], 0
             if down:
-                since = [x for x in (_aware(row.unreachable_since) if row else None,
-                                     _aware(row.last_update_at) if row else None) if x]
+                since = [x for x in (aware(row.unreachable_since) if row else None,
+                                     aware(row.last_update_at) if row else None) if x]
                 days = (now - min(since)).total_seconds() / 86400 if since else 0
                 if days >= down_days:
                     reasons.append(f"unreachable for {days:.0f} days")

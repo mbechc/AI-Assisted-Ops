@@ -178,13 +178,46 @@ def _ports() -> dict[str, list[dict]]:
 
 
 PORTS = _ports()
+# AP id behind each switch port, for ports whose state changes between reads.
+PORT_AP = {(ln["source"], ln["startPortName"]): ln["target"] for ln in estate.links}
+READS: dict[str, int] = {}
+
+
+def _port_status(dev: str, port: dict, n: int) -> str:
+    ap = PORT_AP.get((dev, port["portName"]))
+    if ap in estate.errdis_truth:
+        return "down" if n % 2 == 0 else "up"  # err-disabled, re-enabled, err-disabled again ...
+    if ap in estate.errdis_once:
+        return "down" if n == 2 else "up"
+    return port["status"]
 
 
 @app.get("/dna/intent/api/v1/interface/network-device/{device_id}")
 def interfaces(device_id: str):
     if device_id not in DEVICES:
         return not_found()
-    return {"response": PORTS.get(device_id, []), "version": "1.0"}
+    with LOCK:
+        READS[device_id] = n = READS.get(device_id, 0) + 1
+    return {"response": [{**p, "status": _port_status(device_id, p, n)} for p in PORTS.get(device_id, [])],
+            "version": "1.0"}
+
+
+@app.get("/dna/intent/api/v1/network-device/{device_id}/interface/poe-detail")
+def poe_detail(device_id: str):
+    if device_id not in DEVICES:
+        return not_found()
+    out = []
+    for ln in estate.links:
+        ap = DEVICES.get(ln["target"])
+        if ln["source"] != device_id or not ap or ap["family"] != "Unified AP":
+            continue
+        down = device_id in estate.expected_down or ap["id"] in estate.expected_down
+        alloc = 30.0 if ap["id"] in estate.power_truth else 45.0
+        out.append({"interfaceName": ln["startPortName"], "adminStatus": "AUTO", "operStatus": "OFF" if down else "ON",
+                    "maxPortPower": "60.0", "allocatedPower": "0.0" if down else f"{alloc:.1f}",
+                    "portPowerDrawn": "0.0" if down else f"{alloc - 4:.1f}", "pdDeviceModel": ap["platformId"],
+                    "pdClassSignal": "4" if alloc <= 30 else "5"})
+    return {"response": out, "version": "1.0"}
 
 
 # ------------------------------------------------------------- wireless
@@ -385,6 +418,61 @@ def assurance_devices(offset: int = 1, limit: int = 500):
     return {"response": _page(items, offset, limit), "version": "1.0"}
 
 
+def _compliance() -> dict[str, dict]:
+    import time as _t
+    now = int(_t.time() * 1000)
+    out = {}
+    for d in estate.devices:
+        if d["family"] == "Unified AP":
+            continue
+        days = estate.unsaved_truth.get(d["id"])
+        out[d["id"]] = {"deviceUuid": d["id"], "complianceType": "RUNNING_CONFIG", "state": "SUCCESS",
+                        "status": "COMPLIANT" if days is None else "NON_COMPLIANT",
+                        "lastUpdateTime": now - (days * 86_400_000 if days else 2 * 3_600_000)}
+    return out
+
+
+COMPLIANCE = _compliance()
+
+
+@app.get("/dna/intent/api/v1/compliance/detail")
+def compliance_detail(complianceType: str | None = None, complianceStatus: str | None = None,
+                      deviceUuid: str | None = None, offset: int = 1, limit: int = 500):
+    ids = set(deviceUuid.split(",")) if deviceUuid else None
+    items = [c for c in COMPLIANCE.values() if (not complianceType or c["complianceType"] == complianceType)
+             and (not complianceStatus or c["status"] == complianceStatus) and (ids is None or c["deviceUuid"] in ids)]
+    return {"response": _page(items, offset, limit), "version": "1.0"}
+
+
+@app.post("/dna/intent/api/v1/network-device-config/write-memory")
+async def write_memory(request: Request):
+    if VER < (2, 3, 7):
+        return not_found()
+    ids = (await request.json()).get("deviceId") or []
+    if not ids or any(d not in COMPLIANCE for d in ids):
+        return _new_task("unknown device")
+    for d in ids:
+        COMPLIANCE[d]["status"] = "COMPLIANT"
+        estate.unsaved_truth.pop(d, None)
+    return _new_task()
+
+
+@app.post("/dna/intent/api/v1/compliance/")
+async def compliance_run(request: Request):
+    return _new_task()
+
+
+@app.delete("/dna/intent/api/v1/network-device/{device_id}")
+def delete_device(device_id: str, cleanConfig: bool = False):
+    if device_id not in DEVICES:
+        return not_found()
+    DEVICES.pop(device_id)
+    estate.devices[:] = [d for d in estate.devices if d["id"] != device_id]
+    estate.assignments.pop(device_id, None)
+    COMPLIANCE.pop(device_id, None)
+    return _new_task()
+
+
 MAINT: dict[str, dict] = {}
 TAGS: dict[str, dict] = {}
 
@@ -543,4 +631,18 @@ def truth():
             "uplink_truth": estate.uplink_truth,
             "expected_down": sorted(estate.expected_down), "flapping": sorted(estate.flapping),
             "transient_down": sorted(estate.transient_down), "excluded": sorted(excluded_ids()),
-            "stacks": estate.stacks}
+            "stacks": estate.stacks,
+            "power_truth": sorted(estate.power_truth),
+            "errdis_truth": _port_truth(estate.errdis_truth), "errdis_once": _port_truth(estate.errdis_once),
+            "unsaved_truth": estate.unsaved_truth,
+            "stale": sorted(d["id"] for d in estate.devices if d["reachabilityStatus"] == "Unreachable"
+                            and d["lastUpdateTime"] < _now_ms() - 90 * 86_400_000)}
+
+
+def _now_ms() -> int:
+    import time as _t
+    return int(_t.time() * 1000)
+
+
+def _port_truth(aps: set[str]) -> list[dict]:
+    return [{"switch": sw, "port": port, "ap": ap} for (sw, port), ap in PORT_AP.items() if ap in aps]

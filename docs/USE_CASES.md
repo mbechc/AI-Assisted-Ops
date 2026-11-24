@@ -27,19 +27,25 @@ Every use case follows the same rules:
 | Telemetry baseline | Finding devices with credential, SNMP or sync failures and writing the owner ticket |
 | Device role correction | Fixing switch roles (access, distribution, core) that topology and Assurance depend on |
 | AP uplink health | Checking every AP-facing switch port for half duplex or 100 Mbit (see below) |
+| AP power shortfall | Finding APs that run with radios off because their switch port gives too little PoE |
+| Repeat err-disabled ports | The re-enable, close ticket, err-disabled again loop on ports to APs and switches |
+| Unsaved configuration | Chasing devices where someone never saved the running configuration |
+| Stale inventory | Cleaning out devices that have been unreachable for months |
 
 ## Backlog, ranked by value
 
 | # | Use case | Level | Value | Effort |
 |---|---|---|---|---|
 | 1 | [AP uplink health](#1-ap-uplink-health) | L0 report | High | Low (built) |
-| 2 | [AP power shortfall](#2-ap-power-shortfall) | L0 report | High | Medium |
-| 3 | [Repeat err-disabled ports](#3-repeat-err-disabled-ports) | L0 report | High | Medium |
+| 2 | [AP power shortfall](#2-ap-power-shortfall) | L0 report | High | Medium (built) |
+| 3 | [Repeat err-disabled ports](#3-repeat-err-disabled-ports) | L0 report | High | Medium (built) |
 | 4 | [Alert-noise tuning](#4-alert-noise-tuning) | L1 propose | High | Medium |
-| 5 | [Unsaved configuration](#5-unsaved-configuration) | L1 propose | Medium | Low |
+| 5 | [Unsaved configuration](#5-unsaved-configuration) | L1 propose | Medium | Low (built) |
 | 6 | [AP floor-map hygiene](#6-ap-floor-map-hygiene) | L0 report | Medium | Medium |
-| 7 | [Stale inventory](#7-stale-inventory) | L1 propose | Medium | Low |
+| 7 | [Stale inventory](#7-stale-inventory) | L1 propose | Medium | Low (built) |
 | 8 | [Port and VLAN hygiene](#8-port-and-vlan-hygiene) | L0 report | Medium | Medium |
+
+Next up: alert-noise tuning, then AP floor-map hygiene and port and VLAN hygiene.
 
 Out of scope: security advisories and end-of-life reporting. Cisco IQ covers them, so Steward does not
 duplicate them.
@@ -73,9 +79,13 @@ signal from 9130s turned out to be the PoE draw and the USB port
 Cisco TAC lists APs on too little PoE as a common issue: radios fall back or stay off
 ([Cisco](https://www.cisco.com/c/en/us/support/docs/wireless/catalyst-9100-access-points/215467-cisco-access-point-power-requirements-qu.html)).
 
-**How Steward does it.** Compare each AP model's full-power requirement with the power the switch port
-allocates (PoE data in Catalyst Center Assurance, 2.3.6 and later). Report APs running derated, with the
-options: UPOE port, disable the AP USB port, or an injector.
+**How Steward does it.** The topology gives each AP's switch and port; the PoE API
+(`GET /dna/intent/api/v1/network-device/{id}/interface/poe-detail`, field `allocatedPower`) gives the power the
+port allocates. Steward compares it with the power the AP model needs for full function, from a built-in table
+per model prefix (802.3af 15.4 W, 802.3at 30 W, 802.3bt 45 or 60 W). Check the table against the data sheets of
+the models you run and override entries in the task parameters (for example `C9130=30`). Ports where the switch
+denies power are reported too. The report, grouped per switch, gives the options: UPOE/802.3bt port, LLDP on the
+port, an injector, or disabling the AP USB port. Read-only.
 
 ### 3. Repeat err-disabled ports
 
@@ -84,9 +94,14 @@ the port and close the ticket, it stays up for a day or two and then err disable
 on for two weeks" ([r/networking](https://www.reddit.com/r/networking/comments/kurgei/esxi_host_network_err_disabled/));
 the same loop for lab ports ([r/networking](https://www.reddit.com/r/networking/comments/1phcm92/switch_port_keeps_getting_errordisabled_whats_the/)).
 
-**How Steward does it.** Track interface state across snapshots; ports that go err-disabled repeatedly become
-one item with the count, the cause (BPDU guard, port security, inline power) and the root-cause advice, instead of
-one ticket per occurrence.
+**How Steward does it.** Every run (hourly by default) reads the interfaces of switch ports that have a
+neighbour in the topology: an AP, switch or controller, so the port should always be up. Each time such a port
+goes down while administratively up is recorded; a port down 3 or more times in 7 days becomes one report item
+with the count, the times, the neighbour and the root-cause advice, instead of one ticket per occurrence. Ports
+without a known neighbour (desks, printers) are left out, because they go down whenever someone unplugs.
+Catalyst Center does not return the err-disable reason through its API, so the item lists the likely causes
+(BPDU guard, port security, inline power, UDLD, a flapping link); a port Catalyst Center reports as
+err-disabled is marked as such. Read-only.
 
 ### 4. Alert-noise tuning
 
@@ -106,9 +121,12 @@ Center supports both). The operator approves; nothing is silenced automatically.
 **What operators say.** Startup and running configuration out of sync, then "Run Compliance, wait about 10
 minutes ... re-provision" ([Cisco Community](https://community.cisco.com/t5/cisco-catalyst-center/dnac-compliance-error-startup-vs-running-configuratio/m-p/4283918)).
 
-**How Steward does it.** Devices non-compliant on "Startup vs Running" for more than N days, with who changed
-what and when (Catalyst Center keeps the change history). Propose "write running config to startup"
-through Catalyst Center; the operator approves.
+**How Steward does it.** Devices non-compliant on "Startup vs Running" (compliance type `RUNNING_CONFIG`) for
+3 days or more (adjustable); recent changes are left alone, because someone may still be working on them.
+Steward proposes saving the running configuration through Catalyst Center
+(`POST /dna/intent/api/v1/network-device-config/write-memory`, 2.3.7 and later), re-runs the compliance check and
+verifies the device is compliant again. On older releases the findings are an owner report. The operator
+approves; L2 can save automatically above the confidence threshold.
 
 ### 6. AP floor-map hygiene
 
@@ -127,8 +145,11 @@ so a drop after a Catalyst Center upgrade is caught the same day.
 ([Cisco Community](https://community.cisco.com/t5/cisco-catalyst-center/dna-center-seeking-help-to-delete-a-device-that-is-not/td-p/3792173),
 [Cisco Community](https://community.cisco.com/t5/cisco-catalyst-center/dnac-2-1-2-5-cannot-delete-a-device-from-inventory/td-p/4424016)).
 
-**How Steward does it.** Devices unreachable for more than N days and not on the expected-down list, proposed
-for removal with the clean-up steps that work (clear port assignments, remove from fabric, delete).
+**How Steward does it.** Devices unreachable for 90 days or more (adjustable) are proposed for deletion from
+the Catalyst Center inventory (`DELETE /dna/intent/api/v1/network-device/{id}`), with the reminder to remove
+SD-Access fabric and port assignments first. Devices excluded on purpose are kept: maintenance mode or the
+exclusion tag of Expected-down and flapping devices, and its expected-down sites and hostname prefixes. Deleting
+is never automatic (maximum L1); Steward verifies the device is gone.
 
 ### 8. Port and VLAN hygiene
 

@@ -19,8 +19,8 @@ happens when you approve them.
 
 The mocks are a small web service (`backend/mockcc/`) that implements the Catalyst Center REST API calls
 Steward uses: authentication, release detection, sites, devices, site membership, topology, AP configuration,
-RF neighbours, device health, site assignment, AP rename, role change, resync, maintenance schedules, tags
-and task polling.
+RF neighbours, device health, interfaces, PoE details, configuration compliance, site assignment, AP rename,
+role change, resync, write memory, device deletion, maintenance schedules, tags and task polling.
 
 | | Mock 2.3.5.6 | Mock 3.1.3.0 |
 |---|---|---|
@@ -32,6 +32,7 @@ and task polling.
 | RF neighbours | Not available | Available through the Assurance API |
 | Device health | `/device-health` | `/assuranceNetworkDevices` |
 | Expected-down exclusion | Exclusion tag | Maintenance schedule |
+| Save running configuration | Not available (report only) | `network-device-config/write-memory` |
 
 The two releases deliberately expose different APIs, so each task is exercised on both code paths. The
 seeds differ, so the device names, IDs and counts differ while the structure is the same.
@@ -65,6 +66,10 @@ Each mock generates:
 | Expected-down and flapping devices | Offshore switch and 10 APs unreachable for 400 days; about 1.5% of switches (and a few APs) flap | 11 immediately, flapping devices after a few collections |
 | Telemetry baseline | Of the switches: 3% credential failure, 3% SNMP failure, 4% stale sync (3 to 10 days); 0.5% briefly down (must be left alone) | about 10 to 15 |
 | AP uplink health | About 1% of AP switch ports at 100 Mbit half duplex and 1% at 100 Mbit full duplex (bad cable) | about 2% of the APs with an uplink |
+| AP power shortfall | About 1% of AP switch ports allocate 30 W to a 9130 that needs 45 W | about 1% of the APs with an uplink |
+| Unsaved configuration | About 5% of switches and controllers unsaved for 3 to 20 days; another 5% changed in the last hours (must be left alone) | about 5 to 10 |
+| Stale inventory | The Offshore switch and 10 APs, unreachable for 400 days (also Expected-down candidates; excluded devices are kept) | 11, fewer once excluded |
+| Repeat err-disabled ports | About 1% of AP switch ports go down on every second interface read; another 1% go down once (must be left alone) | about 1% of the APs with an uplink, after 6 runs |
 | Site hierarchy drift | An unused floor `F9` and other empty floors (hygiene). Real drift only on request, see below | "No approved baseline" and hygiene findings |
 
 The ground truth (the real floor of every AP, the intended hostnames, the real roles and so on) is kept in
@@ -82,12 +87,19 @@ the mock and never exposed through the Catalyst Center API. The acceptance test 
   | Expected-down and flapping devices | every 4 hours at :20 |
   | Telemetry baseline | every 6 hours at :40 |
   | AP uplink health | every 6 hours at :50 |
+  | AP power shortfall | every 6 hours at :55 |
+  | Unsaved configuration | every 6 hours at :10 |
+  | Repeat err-disabled ports | hourly at :05 |
   | AP site assignment | daily 05:30 |
   | Wrong-site detection | daily 05:45 |
   | AP hostname reset | daily 05:50 |
   | Site hierarchy drift | daily 06:10 |
   | Device role correction | daily 06:25 |
+  | Stale inventory | daily 06:40 |
 
+- **Repeat err-disabled ports needs history.** A port must go down 3 times within 7 days, and the mock takes
+  the planted ports down on every second read, so they appear after about 6 runs (6 hours with the default
+  hourly schedule).
 - **Flapping needs history.** The mock flips flapping devices between reachable and unreachable on every
   full inventory read. The task needs at least 4 changes within 48 hours, so flapping devices appear after
   about 4 collections (roughly 8 hours with the default collector schedule).

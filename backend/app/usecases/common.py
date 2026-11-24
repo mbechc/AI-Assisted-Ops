@@ -29,3 +29,15 @@ def chunks(seq: list, size: int):
     size = max(1, size)
     for i in range(0, len(seq), size):
         yield seq[i:i + size]
+
+
+def aware(dt: datetime | None) -> datetime | None:
+    if dt is not None and dt.tzinfo is None:
+        return dt.replace(tzinfo=timezone.utc)
+    return dt
+
+
+def split_list(v) -> list[str]:
+    if isinstance(v, list):
+        return [x.strip() for x in v if str(x).strip()]
+    return [x.strip() for x in str(v or "").split(",") if x.strip()]

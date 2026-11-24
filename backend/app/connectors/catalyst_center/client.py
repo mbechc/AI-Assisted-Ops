@@ -5,7 +5,7 @@ from typing import Any
 from app.connectors.catalyst_center.capabilities import INCLUDE_BY_MECHANISM, OPERATIONS, Candidate
 from app.connectors.catalyst_center.http import CCHttp, CCNotSupported, Recorder
 from app.connectors.catalyst_center.models import (
-    ApConfig, Device, Interface, Link, RfNeighbor, Site, TaskHandle, TaskResult,
+    ApConfig, ComplianceRow, Device, Interface, Link, PoePort, RfNeighbor, Site, TaskHandle, TaskResult,
 )
 from app.connectors.catalyst_center.version import Version, detect_release, format_version, parse_version
 
@@ -132,6 +132,21 @@ class CatalystCenter:
 
     def get_interfaces(self, device_id: str) -> list[Interface] | None:
         return self.call("get_interfaces", device_id)
+
+    def get_poe_ports(self, device_id: str) -> list[PoePort] | None:
+        return self.call("get_poe_ports", device_id)
+
+    def get_config_compliance(self, device_ids: list[str] | None = None) -> list[ComplianceRow]:
+        return self.call("get_config_compliance", device_ids)
+
+    def write_memory(self, device_ids: list[str]) -> TaskHandle:
+        return self.call("write_memory", device_ids)
+
+    def run_compliance(self, device_ids: list[str], categories: list[str]) -> TaskHandle:
+        return self.call("run_compliance", device_ids, categories)
+
+    def delete_device(self, device_id: str) -> TaskHandle:
+        return self.call("delete_device", device_id)
 
     def get_ap_config(self, ap: Device) -> ApConfig | None:
         return self.call("get_ap_config", ap)

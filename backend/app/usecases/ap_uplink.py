@@ -34,6 +34,20 @@ def port_key(name: str | None) -> str:
     return f"{m.group(1)[:2]}{m.group(2)}" if m else s
 
 
+def ap_uplinks(inv) -> dict[str, list[tuple[str, str]]]:
+    """Switch id -> [(switch port, AP id)] from the physical topology in the inventory snapshot."""
+    by_id = {d.id: d for d in inv.devices}
+    out: dict[str, list[tuple[str, str]]] = {}
+    for link in inv.links:
+        a, b = by_id.get(link.a_id), by_id.get(link.b_id)
+        if not a or not b or a.is_ap == b.is_ap:
+            continue
+        sw, sw_port, ap = (a, link.a_port, b) if b.is_ap else (b, link.b_port, a)
+        if sw_port:
+            out.setdefault(sw.id, []).append((sw_port, ap.id))
+    return out
+
+
 def classify(intf, min_speed_mbps: int) -> str | None:
     if "half" in (intf.duplex or "").lower():
         return "half_duplex"
@@ -68,14 +82,7 @@ class ApUplinkHealth(TaskDefinition):
         by_id = {d.id: d for d in inv.devices}
         site_label = {s.id: s.hierarchy for s in inv.sites}
 
-        uplinks: dict[str, list[tuple[str, str]]] = {}  # switch id -> [(switch port, AP id)]
-        for link in inv.links:
-            a, b = by_id.get(link.a_id), by_id.get(link.b_id)
-            if not a or not b or a.is_ap == b.is_ap:
-                continue
-            sw, sw_port, ap = (a, link.a_port, b) if b.is_ap else (b, link.b_port, a)
-            if sw_port:
-                uplinks.setdefault(sw.id, []).append((sw_port, ap.id))
+        uplinks = ap_uplinks(inv)
 
         proposals: list[Proposal] = []
         checked: set[str] = set()

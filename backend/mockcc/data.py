@@ -34,6 +34,10 @@ class Estate:
     name_reset: dict[str, str] = field(default_factory=dict)  # AP id -> factory name after POST /mock/reset_names
     stacks: list[str] = field(default_factory=list)  # switch stacks (comma-joined platform and serial)
     uplink_truth: dict[str, str] = field(default_factory=dict)  # AP id -> half_duplex|low_speed switch port
+    power_truth: set[str] = field(default_factory=set)  # AP ids whose switch port allocates too little PoE
+    errdis_truth: set[str] = field(default_factory=set)  # AP ids whose switch port keeps going down
+    errdis_once: set[str] = field(default_factory=set)  # AP ids whose switch port went down once (not repeat)
+    unsaved_truth: dict[str, int] = field(default_factory=dict)  # device id -> days running != startup
 
 
 def build(seed: int = 1, total_aps: int = 6000, unassigned_ratio: float = 0.2) -> Estate:
@@ -160,7 +164,8 @@ def apply_drift(e: Estate) -> dict:
 
 
 def _uplink_faults(e: Estate) -> None:
-    """About 1% of AP switch ports at 100 Mbit half duplex and 1% at 100 Mbit full duplex (bad cable).
+    """About 1% of AP switch ports at 100 Mbit half duplex and 1% at 100 Mbit full duplex (bad cable), 1% on too
+    little PoE, 1% that keep going down (err-disabled) and 1% that went down once; plus unsaved configurations.
 
     Derived from the AP id, not the RNG, so the rest of the estate is unchanged.
     """
@@ -174,6 +179,21 @@ def _uplink_faults(e: Estate) -> None:
             e.uplink_truth[ap] = "half_duplex"
         elif h == 1:
             e.uplink_truth[ap] = "low_speed"
+        elif h == 2:
+            e.power_truth.add(ap)
+        elif h == 3:
+            e.errdis_truth.add(ap)
+        elif h == 4:
+            e.errdis_once.add(ap)
+    # Running configuration not saved: ~5% of switches and controllers for days, ~5% changed in the last hours.
+    for d in e.devices:
+        if d["family"] == "Unified AP" or d["id"] in e.expected_down:
+            continue
+        h = int(d["id"].replace("-", "")[-4:], 16) % 20
+        if h == 0:
+            e.unsaved_truth[d["id"]] = 3 + int(d["id"][:2], 16) % 18
+        elif h == 1:
+            e.unsaved_truth[d["id"]] = 0
 
 
 def _specialist_truth(e: Estate, seed: int, floors_all, cities) -> None:

@@ -16,6 +16,8 @@ from collections import Counter
 
 import httpx
 
+from app.usecases.ap_uplink import port_key
+
 TASK = "ap_site_assignment"
 MOCKS = {"Mock Catalyst Center 2.3.5": "http://mockcc-23:8080", "Mock Catalyst Center 3.1.3": "http://mockcc-31:8080"}
 GEOIP_FOR = "Mock Catalyst Center 3.1.3"
@@ -424,6 +426,80 @@ def check_uplinks(p: Portal, c: Check, src: dict, url: str, args) -> dict | None
     return run
 
 
+def check_power(p: Portal, c: Check, src: dict, url: str, args):
+    configure(p, "ap_power_shortfall", src["id"], level=0)
+    if run_task(p, c, "ap_power_shortfall", args.timeout) is None:
+        return
+    t = set(mock_truth(url)["power_truth"])
+    its = {i["target_key"]: i for i in items(p, "ap_power_shortfall", src["id"])}
+    info(f"AP power: {len(t)} APs on too little PoE in CC, {len(its)} items")
+    c.expect(set(its) == t, "APs on too little PoE found exactly",
+             f"AP power mismatch ({len(set(its) - t)} extra, {len(t - set(its))} missed)")
+    c.expect(all(i["blocked_reason"] for i in its.values()), "AP power findings are report-only",
+             "AP power items are approvable")
+
+
+def check_unsaved(p: Portal, c: Check, src: dict, url: str, args):
+    configure(p, "unsaved_configuration", src["id"], level=1)
+    if run_task(p, c, "unsaved_configuration", args.timeout) is None:
+        return
+    t = mock_truth(url)
+    want = {d for d, days in t["unsaved_truth"].items() if days >= 3}
+    unreachable = set(t["transient_down"]) | set(t["flapping"])
+    its = {i["target_key"]: i for i in items(p, "unsaved_configuration", src["id"])}
+    info(f"unsaved configuration: {len(want)} devices unsaved for 3+ days in CC, {len(its)} items")
+    c.expect(want - unreachable <= set(its) <= want, "devices with unsaved configuration found",
+             f"unsaved mismatch ({len(set(its) - want)} extra, {len(want - unreachable - set(its))} missed)")
+    save = [i for i in its.values() if i["action_type"] == "write_memory"]
+    if not save:
+        c.expect(all(i["blocked_reason"] for i in its.values()),
+                 "no write-memory API on this release: findings are report-only", "report items are approvable")
+        return
+    sample = save[:3]
+    res = approve_and_wait(p, [i["id"] for i in sample], args.timeout)
+    left = mock_truth(url)["unsaved_truth"]
+    c.expect(verified(res, len(sample)) and not {i["target_key"] for i in sample} & set(left),
+             f"saved the configuration on {len(sample)} devices via Catalyst Center and verified", "save failed")
+    show_failures(res)
+
+
+def check_stale(p: Portal, c: Check, src: dict, url: str, args):
+    configure(p, "stale_inventory", src["id"], level=1)
+    if run_task(p, c, "stale_inventory", args.timeout) is None:
+        return
+    t = mock_truth(url)
+    want = set(t["stale"]) - set(t["excluded"])
+    its = {i["target_key"]: i for i in items(p, "stale_inventory", src["id"])}
+    info(f"stale inventory: {len(t['stale'])} devices unreachable 90+ days, {len(t['excluded'])} excluded, "
+         f"{len(its)} delete proposals")
+    c.expect(set(its) == want, "long-unreachable devices proposed for deletion, excluded devices kept",
+             f"stale mismatch ({len(set(its) - want)} extra, {len(want - set(its))} missed)")
+    if len(its) <= 3:
+        info("fewer than 4 stale devices left in this mock; not deleting (restart the mock to reset it)")
+        return
+    sample = sorted(its.values(), key=lambda i: i["target_key"])[:1]
+    res = approve_and_wait(p, [i["id"] for i in sample], args.timeout)
+    c.expect(verified(res, 1) and sample[0]["target_key"] not in mock_truth(url)["hostnames"],
+             "deleted 1 stale device via Catalyst Center and verified", "device deletion failed")
+    show_failures(res)
+
+
+def check_errdisable(p: Portal, c: Check, src: dict, url: str, args):
+    configure(p, "repeat_errdisabled_ports", src["id"], level=0)
+    # The mock takes repeat ports down on every second read: seven runs see at least three times down.
+    for _ in range(7):
+        if run_task(p, c, "repeat_errdisabled_ports", args.timeout) is None:
+            return
+    t = mock_truth(url)
+    down = set(t["transient_down"]) | set(t["expected_down"])
+    repeat = {f"{x['switch']}:{port_key(x['port'])}" for x in t["errdis_truth"]}
+    want = {k for k in repeat if k.split(":")[0] not in down}
+    its = {i["target_key"]: i for i in items(p, "repeat_errdisabled_ports", src["id"])}
+    info(f"err-disabled ports: {len(repeat)} repeat ports in CC, {len(its)} items")
+    c.expect(want <= set(its) <= repeat, "ports that keep going down found, single drops left alone",
+             f"err-disabled mismatch ({len(set(its) - repeat)} extra, {len(want - set(its))} missed)")
+
+
 def check_roles(p: Portal, c: Check, src: dict, url: str, args) -> dict | None:
     configure(p, "device_role_correction", src["id"], level=1)
     run = run_task(p, c, "device_role_correction", args.timeout)
@@ -471,6 +547,10 @@ def check_source(p: Portal, c: Check, src: dict, geo: dict, args):
         tel = check_telemetry(p, c, src, url, args)
         roles = check_roles(p, c, src, url, args)
         check_uplinks(p, c, src, url, args)
+        check_power(p, c, src, url, args)
+        check_unsaved(p, c, src, url, args)
+        check_stale(p, c, src, url, args)
+        check_errdisable(p, c, src, url, args)
         for run, worker in ((tel, "health"), (roles, "inventory")):
             if run:
                 follow_run_log(p, c, run, worker)

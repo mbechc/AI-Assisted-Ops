@@ -14,7 +14,7 @@ from typing import Any, Callable
 
 from app.connectors.catalyst_center.http import CCHttp
 from app.connectors.catalyst_center.models import (
-    ApConfig, Device, Interface, Link, RfNeighbor, Site, TaskHandle, TaskResult,
+    ApConfig, ComplianceRow, Device, Interface, Link, PoePort, RfNeighbor, Site, TaskHandle, TaskResult,
 )
 from app.connectors.catalyst_center.version import Version
 
@@ -189,6 +189,62 @@ def interfaces_v1(http: CCHttp, device_id: str) -> list[Interface]:
             speed_mbps=kbps // 1000 if kbps else None, duplex=it.get("duplex"), status=it.get("status"),
             admin_status=it.get("adminStatus"), description=it.get("description")))
     return out
+
+
+def _float(v: Any) -> float | None:
+    try:
+        return float(v) if v not in (None, "") else None
+    except (TypeError, ValueError):
+        return None
+
+
+def poe_detail_v1(http: CCHttp, device_id: str) -> list[PoePort]:
+    body = http.get(f"/dna/intent/api/v1/network-device/{device_id}/interface/poe-detail")
+    out = []
+    for it in (body or {}).get("response") or []:
+        out.append(PoePort(
+            device_id=device_id, name=it.get("interfaceName") or "",
+            oper_status=it.get("operStatus"), admin_status=it.get("adminStatus"),
+            max_w=_float(it.get("maxPortPower")), allocated_w=_float(it.get("allocatedPower")),
+            drawn_w=_float(it.get("portPowerDrawn")), pd_model=_first(it, "pdDeviceModel", "pdDeviceType"),
+            pd_class=_first(it, "pdClassSignal", "pdClass")))
+    return out
+
+
+# ---------------------------------------------------------------- compliance and configuration
+
+COMPLIANCE_PATH = "/dna/intent/api/v1/compliance/detail"
+
+
+def running_config_compliance_v1(http: CCHttp, device_ids: list[str] | None = None) -> list[ComplianceRow]:
+    """Startup vs Running compliance (complianceType RUNNING_CONFIG); all devices or the given ones."""
+    params = {"complianceType": "RUNNING_CONFIG"}
+    if device_ids:
+        params["deviceUuid"] = ",".join(device_ids)
+    out = []
+    for it in http.paged(COMPLIANCE_PATH, params, limit=500):
+        dev = _first(it, "deviceUuid", "deviceId")
+        if dev:
+            out.append(ComplianceRow(device_id=dev, status=str(it.get("status") or "").upper(),
+                                     last_change_ms=_int(_first(it, "lastUpdateTime", "lastSyncTime"))))
+    return out
+
+
+def write_memory_v1(http: CCHttp, device_ids: list[str]) -> TaskHandle:
+    return _handle(http.request("POST", "/dna/intent/api/v1/network-device-config/write-memory",
+                                json={"deviceId": list(device_ids)}))
+
+
+def run_compliance_v1(http: CCHttp, device_ids: list[str], categories: list[str]) -> TaskHandle:
+    return _handle(http.request("POST", "/dna/intent/api/v1/compliance/",
+                                json={"triggerFull": False, "categories": categories, "deviceUuids": device_ids}))
+
+
+# ---------------------------------------------------------------- write: delete device from inventory
+
+def delete_device_v1(http: CCHttp, device_id: str) -> TaskHandle:
+    return _handle(http.request("DELETE", f"/dna/intent/api/v1/network-device/{device_id}",
+                                params={"cleanConfig": "false"}))
 
 
 # ---------------------------------------------------------------- wireless (via Catalyst Center only)
@@ -453,6 +509,27 @@ OPERATIONS: dict[str, list[Candidate]] = {
     "get_interfaces": [
         Candidate("interfaces_by_device_v1", "intent v1",
                   "GET /dna/intent/api/v1/interface/network-device/{deviceId}", interfaces_v1, per_object=True),
+    ],
+    "get_poe_ports": [
+        Candidate("poe_detail_v1", "intent v1",
+                  "GET /dna/intent/api/v1/network-device/{deviceId}/interface/poe-detail", poe_detail_v1,
+                  verified=False, per_object=True),
+    ],
+    "get_config_compliance": [
+        Candidate("compliance_detail_v1", "intent v1", f"GET {COMPLIANCE_PATH}?complianceType=RUNNING_CONFIG",
+                  running_config_compliance_v1, verified=False),
+    ],
+    "write_memory": [
+        Candidate("write_memory_v1", "intent v1", "POST /dna/intent/api/v1/network-device-config/write-memory",
+                  write_memory_v1, min_version=(2, 3, 7), verified=False),
+    ],
+    "run_compliance": [
+        Candidate("compliance_run_v1", "intent v1", "POST /dna/intent/api/v1/compliance/", run_compliance_v1,
+                  verified=False),
+    ],
+    "delete_device": [
+        Candidate("network_device_delete_v1", "intent v1", "DELETE /dna/intent/api/v1/network-device/{id}",
+                  delete_device_v1, verified=False),
     ],
     "get_ap_config": [
         Candidate("ap_config_summary_v1", "intent v1",

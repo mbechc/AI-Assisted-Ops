@@ -38,6 +38,10 @@ assurance, maps and reports. Steward works through that backlog continuously.
 | Telemetry baseline | health | L3 | Classifies missing telemetry (SNMP, credentials, collection failure, stale sync); resyncs stale devices, reports the rest to the owner |
 | Device role correction | inventory | L2 | Access/distribution/core from the CDP/LLDP topology; corrects wrong roles |
 | AP uplink health | health | L0 | APs whose switch port runs half duplex or below 1 Gbit (the classic 100 Mbit half duplex AP), from the topology and the Catalyst Center interface API; report per switch |
+| AP power shortfall | health | L0 | APs whose switch port allocates less PoE than the AP model needs for full function (editable per-model table), from the switch PoE details; report per switch |
+| Unsaved configuration | health | L2 | Devices whose running configuration has differed from startup for days (compliance: Startup vs Running); saves it via Catalyst Center on 2.3.7+, reports it on older releases |
+| Stale inventory | health | L1 | Devices unreachable for 90+ days that are not excluded on purpose; proposes deleting them from the inventory, always with approval |
+| Repeat err-disabled ports | health | L0 | Switch ports to APs, switches and controllers that keep going down while enabled, tracked across runs; one report item per port with the count |
 
 See [Use cases](docs/USE_CASES.md) for the operator pain behind each task, with forum sources, and the
 ranked backlog of what comes next.

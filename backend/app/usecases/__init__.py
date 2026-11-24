@@ -7,3 +7,7 @@ from app.usecases import expected_down  # noqa: F401
 from app.usecases import telemetry  # noqa: F401
 from app.usecases import device_roles  # noqa: F401
 from app.usecases import ap_uplink  # noqa: F401
+from app.usecases import ap_power  # noqa: F401
+from app.usecases import unsaved_config  # noqa: F401
+from app.usecases import stale_inventory  # noqa: F401
+from app.usecases import port_errdisable  # noqa: F401
