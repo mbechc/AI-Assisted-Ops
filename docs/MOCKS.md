@@ -37,6 +37,11 @@ role change, resync, write memory, device deletion, maintenance schedules, tags 
 The two releases deliberately expose different APIs, so each task is exercised on both code paths. The
 seeds differ, so the device names, IDs and counts differ while the structure is the same.
 
+Both mocks accept two logins with the password `mock`: `admin` (full access, used by the installer) and
+`observer`, which behaves like a Catalyst Center user with `OBSERVER-ROLE`: every read works and every change
+is refused with HTTP 403. Point a data source at a mock with `observer` to try a
+[read-only assessment](READ_ONLY.md).
+
 All mock state lives in memory. Nothing is written to disk.
 
 ### The estate

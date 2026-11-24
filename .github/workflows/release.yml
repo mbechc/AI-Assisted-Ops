@@ -99,6 +99,7 @@ jobs:
           v="${{ steps.v.outputs.version }}"
           flags="--latest"
           [ "${{ steps.v.outputs.prerelease }}" = "true" ] && flags="--prerelease --latest=false"
+          printf '%s\n' "> Steward is an independent open-source project, not a Cisco product. It is provided as is, without warranty, liability or support ([terms](https://github.com/$GITHUB_REPOSITORY/blob/master/DISCLAIMER.md)). For a risk-free evaluation use a read-only Catalyst Center account ([read-only assessment](https://github.com/$GITHUB_REPOSITORY/blob/master/docs/READ_ONLY.md))." "" >dist/notes.md
           # shellcheck disable=SC2086
           gh release create "$GITHUB_REF_NAME" "dist/steward-$v.tar.gz" dist/SHA256SUMS \
-            --title "Steward $v" --generate-notes $flags
+            --title "Steward $v" --notes-file dist/notes.md --generate-notes $flags

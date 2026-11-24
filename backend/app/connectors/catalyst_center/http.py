@@ -2,6 +2,7 @@
 import logging
 import threading
 import time
+from datetime import datetime, timezone
 from typing import Any, Callable, Iterator
 
 import httpx
@@ -9,6 +10,8 @@ import httpx
 log = logging.getLogger(__name__)
 
 Recorder = Callable[[str, str, dict | None, Any, int, Any], None]
+
+WRITE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 
 
 class CCError(Exception):
@@ -23,6 +26,13 @@ class CCNotSupported(CCError):
     """The endpoint does not exist on this release (404/405/501)."""
 
 
+class CCForbidden(CCError):
+    """Catalyst Center refused a change: the account may read but not write (for example OBSERVER-ROLE)."""
+
+    def __str__(self) -> str:
+        return f"Catalyst Center refused the change: the account has no write permission (HTTP {self.status})"
+
+
 class CCHttp:
     def __init__(self, base_url: str, username: str, password: str, verify: bool | str = False,
                  rate_limit_rps: float = 5.0, timeout: float = 60.0, recorder: Recorder | None = None):
@@ -35,6 +45,8 @@ class CCHttp:
         self._last_call = 0.0
         self.recorder = recorder
         self.calls = 0
+        self.write_ok = False
+        self.write_refused_at: str | None = None
         self._client = httpx.Client(base_url=self.base_url, verify=verify, timeout=timeout,
                                     headers={"Accept": "application/json"})
 
@@ -101,10 +113,15 @@ class CCHttp:
             if self.recorder:
                 self.recorder(method, path, params, json, resp.status_code, body)
 
+            write = method.upper() in WRITE_METHODS
+            if write and resp.status_code in (401, 403):
+                self.write_refused_at = datetime.now(timezone.utc).isoformat()
+                raise CCForbidden(resp.status_code, _error_text(body), path)
             if resp.status_code in (404, 405, 501):
                 raise CCNotSupported(resp.status_code, _error_text(body), path)
             if resp.status_code >= 400:
                 raise CCError(resp.status_code, _error_text(body), path)
+            self.write_ok = self.write_ok or write
             return body
 
     def get(self, path: str, params: dict | None = None) -> Any:

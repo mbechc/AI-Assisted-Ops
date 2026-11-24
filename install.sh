@@ -26,6 +26,8 @@ CHANNEL=""
 OFFLINE_BUNDLE=""
 SKIP_DOCKER_INSTALL=0
 ASSUME_YES=0
+ACCEPT_TERMS=0
+TERMS_PENDING=""
 
 usage() {
   cat <<EOF
@@ -43,7 +45,8 @@ Usage: sudo ./install.sh [options]
   --offline-bundle FILE   Install from an offline bundle (no Internet needed; Docker must be installed)
   --skip-docker-install   Never install Docker (fail if missing)
   --skip-model            Deprecated, no effect: the LLM is never installed by the installer
-  -y, --yes               Non-interactive
+  --accept-terms          Accept the terms in DISCLAIMER.md without the prompt (unattended installs)
+  -y, --yes               Non-interactive (does not accept the terms)
 EOF
 }
 
@@ -63,6 +66,7 @@ while [ $# -gt 0 ]; do
     --offline-bundle) OFFLINE_BUNDLE="$(cd "$(dirname "$2")" && pwd)/$(basename "$2")"; shift 2 ;;
     --skip-docker-install) SKIP_DOCKER_INSTALL=1; shift ;;
     --skip-model) c_warn "--skip-model is deprecated: the local LLM is only installed from Configure > AI assistance"; shift ;;
+    --accept-terms) ACCEPT_TERMS=1; shift ;;
     -y|--yes) ASSUME_YES=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) usage; die "unknown option $1" ;;
@@ -184,7 +188,7 @@ stage_files() {
       | (cd "$INSTALL_DIR" && tar --no-same-owner -xf -)
   fi
   mkdir -p "$INSTALL_DIR/certs" "$INSTALL_DIR/data/fixtures" "$INSTALL_DIR/data/geoip" "$INSTALL_DIR/data/update/requests" \
-    "$INSTALL_DIR/data/llm" "$INSTALL_DIR/backups"
+    "$INSTALL_DIR/data/llm" "$INSTALL_DIR/data/terms" "$INSTALL_DIR/backups"
   find "$INSTALL_DIR" -path "$INSTALL_DIR/data" -prune -o ! -user root -exec chown root:root {} +
   chmod go-w "$INSTALL_DIR"
   chown -R 10001:10001 "$INSTALL_DIR/data"
@@ -349,11 +353,35 @@ refresh_local_llm() {
   llm_pull_model || c_warn "model $MODEL could not be pulled; AI review falls back to rules"
 }
 
+# ------------------------------------------------------------------ terms of use
+
+# Fresh installs need the terms accepted (typed on the terminal or --accept-terms) before anything is
+# written. Unattended upgrades of an older installation without a record continue; the portal asks an
+# admin to run scripts/accept-terms.sh.
+check_terms() {
+  local terms="$SRC_DIR/DISCLAIMER.md"
+  [ -f "$terms" ] || die "DISCLAIMER.md is missing from the package"
+  terms_accepted && return 0
+  if [ "$ACCEPT_TERMS" = 1 ]; then
+    TERMS_PENDING=flag
+  elif have_tty; then
+    terms_prompt "$terms" || die "terms not accepted: nothing was installed"
+    TERMS_PENDING=typed
+  elif [ ! -f "$INSTALL_DIR/.env" ]; then
+    die "Steward's terms (DISCLAIMER.md) must be accepted: run the installer on a terminal, or add --accept-terms"
+  else
+    c_warn "Terms not accepted on this installation yet: run sudo $INSTALL_DIR/scripts/accept-terms.sh"
+    return 0
+  fi
+  c_ok "Terms accepted (DISCLAIMER.md, $TERMS_PENDING)"
+}
+
 # ------------------------------------------------------------------ main
 
 main() {
   require_root
   c_info "Steward $VERSION installer -> $INSTALL_DIR"
+  check_terms
   detect_os
   ensure_docker
   HTTPS_PORT="${HTTPS_PORT_ARG:-443}"
@@ -369,6 +397,7 @@ main() {
   fi
 
   stage_files
+  [ -n "$TERMS_PENDING" ] && terms_record "$INSTALL_DIR/DISCLAIMER.md" "$TERMS_PENDING"
   configure_env
   open_firewall
   tune_kernel
@@ -429,6 +458,10 @@ main() {
     echo "    Login: existing users unchanged"
   fi
   echo "    Updates: Configure > Updates (track: $(env_get STEWARD_UPDATE_CHANNEL)). Internet access is only needed for updates."
+  echo
+  echo "    Steward is an independent open-source project, not a Cisco product (see DISCLAIMER.md)."
+  echo "    To evaluate it without any risk of change, give it a Catalyst Center user with the read-only"
+  echo "    OBSERVER-ROLE: Catalyst Center then refuses every change (see docs/READ_ONLY.md)."
 }
 
 main "$@"

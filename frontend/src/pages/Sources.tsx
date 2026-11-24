@@ -1,7 +1,7 @@
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useAuth } from "../App";
-import { api, fmtDate } from "../api";
+import { api, fmtDate, READ_ONLY_URL } from "../api";
 import { ErrorLine, Modal, Status, useAsync } from "../components";
 import { CapabilityRow, Source } from "../types";
 
@@ -81,7 +81,14 @@ export default function Sources() {
                 <td><b>{s.name}</b>{!s.enabled && <span className="badge muted" style={{ marginLeft: 6 }}>disabled</span>}</td>
                 <td className="small">{s.kind === "geoip" ? <span className="badge info">GeoIP (optional)</span> : s.base_url}</td>
                 <td>{s.detected_version || <span className="muted">unknown</span>}<div className="small muted">{s.version_source}</div></td>
-                <td><Status value={s.last_status} /></td>
+                <td>
+                  <Status value={s.last_status} />
+                  {s.write_refused_at && (
+                    <div className="small muted" title={`Last refusal ${fmtDate(s.write_refused_at)}`}>
+                      Catalyst Center refused changes (read-only account)
+                    </div>
+                  )}
+                </td>
                 <td className="small muted">{fmtDate(s.last_check_at)}</td>
                 <td className="num">
                   <div className="row end">
@@ -129,6 +136,10 @@ export default function Sources() {
                 <label className="field">Username<input autoComplete="off" value={edit.username} onChange={(e) => setEdit({ ...edit, username: e.target.value })} /></label>
                 <label className="field">Password{edit.id ? " (leave empty to keep)" : ""}<input type="password" autoComplete="new-password" value={edit.password} onChange={(e) => setEdit({ ...edit, password: e.target.value })} /></label>
               </div>
+              <p className="small muted" style={{ marginTop: -4 }}>
+                For an assessment, use a Catalyst Center user with the read-only OBSERVER-ROLE: Catalyst Center then refuses
+                every change. No Steward setting is a substitute (<a href={READ_ONLY_URL} target="_blank" rel="noreferrer">read-only assessment</a>).
+              </p>
               <label className="field">API rate limit (requests/second)<input type="number" value={edit.rate_limit_rps} onChange={(e) => setEdit({ ...edit, rate_limit_rps: Number(e.target.value) })} /></label>
               <label className="check"><input type="checkbox" checked={edit.verify_tls} onChange={(e) => setEdit({ ...edit, verify_tls: e.target.checked })} /> Verify TLS certificate</label>
               {edit.verify_tls && <label className="field" style={{ marginTop: 8 }}>CA bundle (PEM, optional)<textarea value={edit.ca_bundle} onChange={(e) => setEdit({ ...edit, ca_bundle: e.target.value })} /></label>}

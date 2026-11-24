@@ -32,6 +32,7 @@ class CatalystCenter:
         self.version: Version | None = parse_version(state.get("version"))
         self.version_source: str = state.get("version_source", "")
         self._ops: dict[str, dict] = {op: dict(v) for op, v in (state.get("ops") or {}).items()}
+        self._write_refused_at: str | None = state.get("write_refused_at")
         self._misses: dict[tuple[str, str], int] = {}
         self._hits: set[tuple[str, str]] = set()
 
@@ -50,10 +51,15 @@ class CatalystCenter:
         return self.version
 
     def capability_state(self) -> dict:
+        if self.http.write_refused_at:
+            self._write_refused_at = self.http.write_refused_at
+        elif self.http.write_ok:
+            self._write_refused_at = None
         return {
             "version": format_version(self.version) if self.version else None,
             "version_source": self.version_source,
             "ops": self._ops,
+            "write_refused_at": self._write_refused_at,
         }
 
     def capability_report(self) -> list[dict]:

@@ -1,8 +1,12 @@
+import logging
+
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse
 
+from app import terms
 from app.api import admin, ai, auth, digest, geoip, inventory, logs, review, runners, sources, tasks, updates
 from app.config import get_settings
+from app.db import session_scope
 from app.framework import registry
 from app.logging_setup import configure_logging
 
@@ -29,6 +33,11 @@ async def csrf_guard(request: Request, call_next):
 @app.on_event("startup")
 def startup() -> None:
     registry.load_all()
+    try:
+        with session_scope() as db:
+            terms.audit_acceptance(db)
+    except Exception as exc:  # noqa: BLE001 - the database may still be migrating
+        logging.getLogger(__name__).warning("terms acceptance not audited: %s", exc)
 
 
 @app.get("/api/health")

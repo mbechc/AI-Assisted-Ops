@@ -103,3 +103,33 @@ wait_healthy() {
   done
   return 1
 }
+
+# ------------------------------------------------------------------ terms of use (DISCLAIMER.md)
+# Acceptance is recorded once per installation in data/terms/acceptance.json (read-only in the containers).
+
+TERMS_RECORD_REL="data/terms/acceptance.json"
+
+terms_accepted() { [ -s "$INSTALL_DIR/$TERMS_RECORD_REL" ]; }
+
+have_tty() { { : </dev/tty; } 2>/dev/null; }
+
+# terms_record FILE METHOD: write the acceptance record (method: typed | flag).
+terms_record() {
+  local terms="$1" method="$2" out="$INSTALL_DIR/$TERMS_RECORD_REL" ver sha
+  ver="$(sed -n 's/^Terms version \([0-9][0-9]*\).*/\1/p' "$terms" | head -1)"
+  sha="$(sha256sum "$terms" | awk '{print $1}')"
+  mkdir -p "$(dirname "$out")"
+  printf '{"terms_version": %s, "sha256": "%s", "accepted_at": "%s", "accepted_by": "%s", "host": "%s", "steward_version": "%s", "method": "%s"}\n' \
+    "${ver:-0}" "$sha" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" "${SUDO_USER:-$(id -un)}" "$(hostname)" \
+    "${VERSION:-unknown}" "$method" >"$out"
+  chown -R 10001:10001 "$(dirname "$out")" 2>/dev/null || true
+  chmod 644 "$out"
+}
+
+# terms_prompt FILE: show the terms on the terminal and return 0 only if the user types ACCEPT.
+terms_prompt() {
+  local ans
+  { printf '\n'; cat "$1"; printf '\n'; } >/dev/tty
+  read -r -p "Type ACCEPT to accept these terms, anything else aborts: " ans </dev/tty 2>/dev/tty || return 1
+  [ "$ans" = "ACCEPT" ]
+}

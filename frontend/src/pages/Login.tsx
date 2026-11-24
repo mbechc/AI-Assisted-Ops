@@ -1,5 +1,5 @@
 import { FormEvent, useState } from "react";
-import { api } from "../api";
+import { api, TERMS_URL } from "../api";
 import { User } from "../types";
 
 export default function Login({ onLogin }: { onLogin: (u: User) => void }) {
@@ -37,6 +37,10 @@ export default function Login({ onLogin }: { onLogin: (u: User) => void }) {
         {error && <p className="err">{error}</p>}
         <button className="primary" disabled={busy || !username || !password} type="submit">Sign in</button>
       </form>
+      <p className="small muted" style={{ marginTop: 16 }}>
+        Steward is an independent open-source project, not a Cisco product. Provided as is, without warranty or
+        support. <a href={TERMS_URL} target="_blank" rel="noreferrer">Terms</a>
+      </p>
     </div>
   );
 }

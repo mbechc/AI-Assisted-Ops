@@ -132,6 +132,18 @@ export function qsMulti(params: Record<string, string | number | boolean | (stri
   return s ? `?${s}` : "";
 }
 
+export const TERMS_URL = "https://github.com/mbechc/Steward/blob/master/DISCLAIMER.md";
+export const READ_ONLY_URL = "https://github.com/mbechc/Steward/blob/master/docs/READ_ONLY.md";
+
+export interface TermsRecord {
+  accepted: boolean;
+  terms_version?: number;
+  accepted_at?: string;
+  accepted_by?: string;
+  method?: string;
+  steward_version?: string;
+}
+
 export function fmtDate(v?: string | null): string {
   if (!v) return "-";
   const d = new Date(v);

@@ -10,7 +10,7 @@ from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 from sqlalchemy.orm import Session
 
 from app.audit import audit
-from app.connectors.catalyst_center.http import CCError
+from app.connectors.catalyst_center.http import CCError, CCForbidden
 from app.db import session_scope
 from app.framework import registry
 from app.framework.autonomy import effective_autonomy
@@ -143,6 +143,8 @@ def execute_run(run_id: int) -> None:
 
 def friendly_error(exc: BaseException) -> str:
     """One readable line for operators; the traceback only goes to the container log."""
+    if isinstance(exc, CCForbidden):
+        return str(exc)
     if isinstance(exc, CCError):
         return f"Catalyst Center request failed (HTTP {exc.status}): {exc.message[:160]}"
     if isinstance(exc, httpx.TimeoutException):
@@ -402,7 +404,7 @@ def _execute_items(task_key: str, ids: list[int]) -> None:
             except Exception as exc:  # noqa: BLE001
                 log.exception("execution failed for %s", task_key)
                 for item in group:
-                    item.status, item.exec_result = "failed", {"error": str(exc)}
+                    item.status, item.exec_result = "failed", {"error": friendly_error(exc)}
             finally:
                 try:
                     ctx.close()

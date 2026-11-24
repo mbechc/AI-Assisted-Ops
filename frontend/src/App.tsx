@@ -1,6 +1,6 @@
 import { createContext, ReactNode, useContext, useEffect, useRef, useState } from "react";
 import { NavLink, Navigate, Route, Routes, useLocation } from "react-router-dom";
-import { api, ConnectionError, isOnline, LOST_CONNECTION, probe } from "./api";
+import { api, ConnectionError, isOnline, LOST_CONNECTION, probe, TERMS_URL, TermsRecord } from "./api";
 import { useAsync } from "./components";
 import { applyTheme } from "./theme";
 import { Role, User } from "./types";
@@ -147,6 +147,7 @@ function ShellBody() {
   const { hasNew } = useNews();
   const { data: summary } = useAsync(() => api.get<Record<string, Record<string, number>>>("/items/summary"), [], 30000);
   const { data: settings } = useAsync(() => api.get<{ kill_switch: boolean; global_autonomy_cap: number }>("/settings"), [], 30000);
+  const { data: terms } = useAsync(() => api.get<TermsRecord>("/terms"), [], 300000);
   const pending = Object.values(summary || {}).reduce((n, s) => n + (s.proposed || 0), 0);
 
   return (
@@ -189,6 +190,12 @@ function ShellBody() {
         {settings?.kill_switch && (
           <div className="banner bad">
             Kill switch is ON: no changes are executed against the network. Proposals are still generated and can be reviewed.
+          </div>
+        )}
+        {can("admin") && terms && !terms.accepted && (
+          <div className="banner warn">
+            Steward's <a href={TERMS_URL} target="_blank" rel="noreferrer">terms</a> are not accepted on this installation yet.
+            Run <code>sudo /opt/Steward/scripts/accept-terms.sh</code> on the host.
           </div>
         )}
         <NewHere />

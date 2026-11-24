@@ -2,6 +2,13 @@
 
 *Formerly AIOps.*
 
+> **Not a Cisco product.** Steward is an independent, personal open-source project. It is not affiliated
+> with, endorsed by or supported by Cisco, and it is provided as is, without warranty or liability
+> ([terms](DISCLAIMER.md), Apache License 2.0). The installer asks you to accept the terms.
+> To evaluate Steward without any risk of change, give it a Catalyst Center user with the read-only
+> `OBSERVER-ROLE`: Catalyst Center then refuses every change ([read-only assessment](docs/READ_ONLY.md)).
+> Steward's own settings (kill switch, autonomy caps) are conveniences, not a security boundary.
+
 **An expert system that clears the 80% repetitive Catalyst Center tasks, shows
 its evidence, and only acts as autonomously as you allow. AI is optional, local or in your own Azure
 tenant.**
@@ -132,6 +139,7 @@ curl -fsSL https://raw.githubusercontent.com/mbechc/Steward/master/get-steward.s
 | `--hostname NAME` | Name in the TLS certificate and portal URL |
 | `--admin-password PW` | Set the initial admin password instead of generating one |
 | `--https-port N` / `--http-port N` | Published ports (default 443/80) |
+| `--accept-terms` | Accept the [terms](DISCLAIMER.md) without the prompt (unattended installs); otherwise the installer shows them and asks you to type ACCEPT |
 | `--with-mock` | Also start two simulated Catalyst Centers (2.3.5.6 and 3.1.3.0) for evaluation. See [what the mocks simulate](docs/MOCKS.md) |
 
 Behind a proxy: `export https_proxy=http://proxy:3128` and run `sudo -E bash` instead of `sudo bash`;

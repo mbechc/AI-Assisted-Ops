@@ -20,6 +20,7 @@ VER = tuple(int(x) for x in RELEASE.split("."))
 NEW_API = VER >= (2, 3, 7, 6)
 V3 = VER >= (3, 0)
 TOKEN = "mock-token-" + uuid.uuid4().hex
+OBSERVER_TOKEN = "mock-observer-" + uuid.uuid4().hex
 estate = build(seed=int(os.environ.get("MOCK_CC_SEED", "1")), total_aps=int(os.environ.get("MOCK_CC_APS", "6000")))
 SITES = {s["id"]: s for s in estate.sites}
 DEVICES = {d["id"]: d for d in estate.devices}
@@ -41,8 +42,11 @@ async def auth_and_throttle(request: Request, call_next):
     path = request.url.path
     if path in ("/dna/system/api/v1/auth/token", "/healthz") or path.startswith("/mock/"):
         return await call_next(request)
-    if request.headers.get("X-Auth-Token") != TOKEN:
+    token = request.headers.get("X-Auth-Token")
+    if token not in (TOKEN, OBSERVER_TOKEN):
         return JSONResponse({"message": "Unauthorized"}, status_code=401)
+    if token == OBSERVER_TOKEN and request.method not in ("GET", "HEAD", "OPTIONS"):
+        return JSONResponse({"message": "User does not have permission to perform this operation"}, status_code=403)
     with LOCK:
         COUNTER["n"] += 1
         n = COUNTER["n"]
@@ -63,9 +67,9 @@ def token(request: Request):
         user, pw = base64.b64decode(auth.split()[1]).decode().split(":", 1)
     except Exception:  # noqa: BLE001
         raise HTTPException(401, "bad auth")
-    if (user, pw) != ("admin", "mock"):
+    if pw != "mock" or user not in ("admin", "observer"):
         raise HTTPException(401, "bad credentials")
-    return {"Token": TOKEN}
+    return {"Token": OBSERVER_TOKEN if user == "observer" else TOKEN}
 
 
 @app.get("/dna/intent/api/v1/dnac-release")

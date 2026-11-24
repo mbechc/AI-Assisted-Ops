@@ -5,6 +5,9 @@
 #   curl -fsSL https://raw.githubusercontent.com/mbechc/Steward/master/get-steward.sh | sudo bash
 #   curl -fsSL .../get-steward.sh | sudo bash -s -- --channel development --with-mock
 #
+# The installer shows Steward's terms (DISCLAIMER.md) and asks you to type ACCEPT on the terminal;
+# unattended installs pass --accept-terms instead.
+#
 # Behind a proxy, export https_proxy and run with sudo -E.
 set -euo pipefail
 
@@ -27,7 +30,7 @@ Usage: get-steward.sh [options] [install.sh options]
   -h, --help         This help
 
 Any other option is passed to install.sh, for example --with-mock, --hostname NAME,
---admin-password PW, --https-port N.
+--admin-password PW, --https-port N, --accept-terms (accept DISCLAIMER.md without the prompt).
 EOF
 }
 

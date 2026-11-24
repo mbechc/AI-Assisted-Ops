@@ -7,7 +7,7 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=None, extra="ignore")
 
-    steward_version: str = "2026.11.2-dev.1"
+    steward_version: str = "2026.11.2-dev.2"
     steward_hostname: str = "steward.local"
 
     postgres_db: str = "steward"
@@ -31,6 +31,7 @@ class Settings(BaseSettings):
     geoip_dir: str = "/data/geoip"
     logproxy_url: str = "http://logproxy:2375"
     update_dir: str = "/data/update"
+    terms_file: str = "/data/terms/acceptance.json"
     steward_update_repo: str = "mbechc/Steward"
     steward_update_channel: str = "production"
     steward_connectivity_interval_min: int = 15

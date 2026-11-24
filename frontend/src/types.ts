@@ -174,6 +174,7 @@ export interface Source {
   last_check_at: string | null;
   last_status: string | null;
   version_source: string | null;
+  write_refused_at?: string | null;
 }
 
 export interface CapabilityRow {

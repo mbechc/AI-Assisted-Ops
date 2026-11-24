@@ -1,7 +1,7 @@
 {
   "name": "steward-web",
   "private": true,
-  "version": "2026.11.2-dev.1",
+  "version": "2026.11.2-dev.2",
   "type": "module",
   "scripts": {
     "dev": "vite",

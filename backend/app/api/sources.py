@@ -38,7 +38,8 @@ def source_out(s: DataSource) -> dict:
     return {"id": s.id, "name": s.name, "kind": s.kind, "base_url": s.base_url, "username": s.username,
             "verify_tls": s.verify_tls, "has_ca_bundle": bool(s.ca_bundle), "rate_limit_rps": s.rate_limit_rps,
             "enabled": s.enabled, "detected_version": s.detected_version, "last_check_at": s.last_check_at,
-            "last_status": s.last_status, "version_source": (s.capabilities or {}).get("version_source")}
+            "last_status": s.last_status, "version_source": (s.capabilities or {}).get("version_source"),
+            "write_refused_at": (s.capabilities or {}).get("write_refused_at")}
 
 
 @router.get("")

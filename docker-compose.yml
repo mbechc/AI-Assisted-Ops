@@ -13,7 +13,7 @@ x-logging: &logging
     max-file: "5"
 
 x-backend: &backend
-  image: ${STEWARD_IMAGE_PREFIX:-ghcr.io/mbechc/steward}-backend:${STEWARD_VERSION:-2026.11.2-dev.1}
+  image: ${STEWARD_IMAGE_PREFIX:-ghcr.io/mbechc/steward}-backend:${STEWARD_VERSION:-2026.11.2-dev.2}
   build:
     context: ./backend
   env_file: .env
@@ -24,6 +24,7 @@ x-backend: &backend
     - ./data/fixtures:/data/fixtures:z
     - ./data/geoip:/data/geoip:z
     - ./data/update:/data/update:z
+    - ./data/terms:/data/terms:ro,z
   depends_on:
     postgres:
       condition: service_healthy
@@ -184,7 +185,7 @@ services:
       retries: 5
 
   web:
-    image: ${STEWARD_IMAGE_PREFIX:-ghcr.io/mbechc/steward}-web:${STEWARD_VERSION:-2026.11.2-dev.1}
+    image: ${STEWARD_IMAGE_PREFIX:-ghcr.io/mbechc/steward}-web:${STEWARD_VERSION:-2026.11.2-dev.2}
     build:
       context: ./frontend
     restart: unless-stopped

@@ -65,10 +65,10 @@ def truth(mock_module) -> dict:
     return TestClient(mock_module.app).get("/mock/truth").json()
 
 
-def cc_client(mock_module):
+def cc_client(mock_module, username: str = "admin"):
     from fastapi.testclient import TestClient
     from app.connectors.catalyst_center import CatalystCenter
-    cc = CatalystCenter("http://mockcc", "admin", "mock", rate_limit_rps=0)
+    cc = CatalystCenter("http://mockcc", username, "mock", rate_limit_rps=0)
     cc.http._client.close()
     cc.http._client = TestClient(mock_module.app, base_url="http://mockcc")
     return cc

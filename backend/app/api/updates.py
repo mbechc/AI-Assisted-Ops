@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
 from sqlalchemy.orm import Session
 
-from app import updates
+from app import terms, updates
 from app.audit import audit
 from app.deps import current_user, get_db, require
 from app.models import User
@@ -68,6 +68,12 @@ def install(body: InstallIn, db: Session = Depends(get_db), user: User = Depends
           from_version=st["current_version"], to_version=body.version)
     db.commit()
     return _state(user)
+
+
+@router.get("/terms")
+def get_terms(_=Depends(current_user)):
+    rec = terms.acceptance()
+    return {"accepted": rec is not None, **(rec or {})}
 
 
 @router.get("/updates/log")
