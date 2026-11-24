@@ -1,4 +1,6 @@
-# AIOps: AI-Assisted Operations for Cisco Catalyst Center
+# Steward: AI-assisted operations for Cisco Catalyst Center
+
+*Formerly AIOps.*
 
 **An expert system that clears the 80% repetitive Catalyst Center tasks, shows
 its evidence, and only acts as autonomously as you allow. AI is optional, local or in your own Azure
@@ -9,7 +11,7 @@ tenant.**
 Every Catalyst Center estate collects the same low-priority debt: APs without a site, devices on the wrong
 floor, APs back on factory names, roles that drifted, devices that have been down for months and
 telemetry that silently stopped. Each fix is small; together they eat engineering days and degrade
-assurance, maps and reports. AIOps works through that backlog continuously.
+assurance, maps and reports. Steward works through that backlog continuously.
 
 - **Evidence, not guesses.** Every proposal carries a confidence score and the signals behind it
   (CDP/LLDP neighbours, RF neighbours, naming, subnets, inventory history, optional GeoIP).
@@ -98,24 +100,29 @@ dnf install -y curl sudo                         # RHEL / Rocky / AlmaLinux
 Then run one command on the host:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/mbechc/AI-Assisted-Ops/master/get-aiops.sh | sudo bash
+curl -fsSL https://raw.githubusercontent.com/mbechc/Steward/master/get-steward.sh | sudo bash
 ```
 
-It finds the newest Production release on GitHub, verifies its checksum, installs into `/opt/AIOps`,
+It finds the newest Production release on GitHub, verifies its checksum, installs into `/opt/Steward`,
 pulls the prebuilt images from ghcr.io, initialises the database, creates the `admin` user and runs a
 self-test. No LLM is downloaded: the appliance starts in No AI mode. At the end it prints the portal URL and the admin password (also stored
-in `/opt/AIOps/initial-admin-password.txt`; delete it after the first login).
+in `/opt/Steward/initial-admin-password.txt`; delete it after the first login).
+
+**Moving from AIOps.** Steward is the renamed AIOps and has no in-place upgrade from it. On a host that
+runs AIOps, remove it first with `sudo /opt/AIOps/scripts/uninstall.sh --purge` (this deletes its data),
+then install Steward with the command above. Devices that AIOps excluded with the `AIOPS-EXCLUDED` tag are
+still recognised, so Steward can include them again.
 
 Options go after `bash -s --`:
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/mbechc/AI-Assisted-Ops/master/get-aiops.sh \
-  | sudo bash -s -- --hostname aiops.example.com --channel production
+curl -fsSL https://raw.githubusercontent.com/mbechc/Steward/master/get-steward.sh \
+  | sudo bash -s -- --hostname steward.example.com --channel production
 ```
 
 | Option | Meaning |
 |---|---|
-| `--dir DIR` | Installation folder (default `/opt/AIOps`) |
+| `--dir DIR` | Installation folder (default `/opt/Steward`) |
 | `--channel production\|development` | Update track (default `production`) |
 | `--version YYYY.M.R` | Install a specific release, for example `2026.11.0` |
 | `--hostname NAME` | Name in the TLS certificate and portal URL |
@@ -144,8 +151,8 @@ configure the Docker daemon proxy as well, so image pulls work.
    Deleting a data source (admins) removes its inventory data and closes its open review items and queued
    runs; finished runs and decisions stay in the history. The simulated sources are added once, so a
    deleted one does not come back on upgrade.
-7. Optional: replace `/opt/AIOps/certs/server.crt` and `server.key` with your own certificate and run
-   `docker compose restart web` in `/opt/AIOps`.
+7. Optional: replace `/opt/Steward/certs/server.crt` and `server.key` with your own certificate and run
+   `docker compose restart web` in `/opt/Steward`.
 8. **AI assistance (optional)**: see [Enabling AI](#enabling-ai).
 
 ### Enabling AI
@@ -157,9 +164,9 @@ task run uses the new mode.
   (about 5 GB, from `registry.ollama.ai`). The section shows the progress and log; until the model is
   ready the tasks keep running without AI. **Remove model** stops the container and deletes the model;
   switching to another mode stops it and optionally deletes it. From the shell:
-  `sudo /opt/AIOps/scripts/update.sh --llm enable|disable|remove`. Air-gapped: put an
+  `sudo /opt/Steward/scripts/update.sh --llm enable|disable|remove`. Air-gapped: put an
   `ollama-models.tgz` (from `scripts/export-bundle.sh` on a host that has the model) in
-  `/opt/AIOps/data/llm/` before enabling.
+  `/opt/Steward/data/llm/` before enabling.
 - **Azure OpenAI**: create an Azure OpenAI resource and a chat model deployment (for example
   `gpt-4o-mini`) in your tenant. Enter the endpoint (`https://<resource>.openai.azure.com`), the
   deployment name and an API key, or a Microsoft Entra app registration (tenant ID, client ID, secret)
@@ -220,31 +227,31 @@ Updates are online only. The host must reach:
 
 **Refresh** tests the GitHub endpoints from the Linux host itself (its DNS, proxy and firewall) and shows
 each one as reachable or not, with the response time or the error. The same test runs every 15 minutes
-(`AIOPS_CONNECTIVITY_INTERVAL_MIN` in `.env`) and drives the status on the **Dashboard**: **Connected**
+(`STEWARD_CONNECTIVITY_INTERVAL_MIN` in `.env`) and drives the status on the **Dashboard**: **Connected**
 when every endpoint answered, **AirGapped** when one or more did not. The appliance keeps working without
 Internet; only updates need it.
 
 How it works: the portal never gets root or the Docker socket. It drops a request file into
-`/opt/AIOps/data/update/requests`; the systemd unit `aiops-updater.path` starts `scripts/update.sh` on the
+`/opt/Steward/data/update/requests`; the systemd unit `steward-updater.path` starts `scripts/update.sh` on the
 host, which writes its results back to `data/update`. From the shell:
 
 ```bash
-sudo /opt/AIOps/scripts/update.sh --check            # reachability and release lookup
-sudo /opt/AIOps/scripts/update.sh --channel development
-sudo /opt/AIOps/scripts/update.sh --version 2026.11.0
+sudo /opt/Steward/scripts/update.sh --check            # reachability and release lookup
+sudo /opt/Steward/scripts/update.sh --channel development
+sudo /opt/Steward/scripts/update.sh --version 2026.11.0
 ```
 
 **Rollback**: restore the backup taken right before the update without migrating it, then install the
 previous release:
 
 ```bash
-sudo /opt/AIOps/scripts/restore.sh --no-migrate /opt/AIOps/backups/db-<timestamp>.sql.gz
-curl -fsSL https://raw.githubusercontent.com/mbechc/AI-Assisted-Ops/master/get-aiops.sh | sudo bash -s -- --version <previous>
+sudo /opt/Steward/scripts/restore.sh --no-migrate /opt/Steward/backups/db-<timestamp>.sql.gz
+curl -fsSL https://raw.githubusercontent.com/mbechc/Steward/master/get-steward.sh | sudo bash -s -- --version <previous>
 ```
 
 ## Operations
 
-All scripts are in `/opt/AIOps`:
+All scripts are in `/opt/Steward`:
 
 | Command | Purpose |
 |---|---|
@@ -259,27 +266,27 @@ All scripts are in `/opt/AIOps`:
 Keep a copy of `.env`: it contains the key that encrypts stored Catalyst Center credentials.
 
 **Kernel setting for Redis.** The installer sets `vm.overcommit_memory = 1` in
-`/etc/sysctl.d/90-aiops.conf`, which Redis needs for reliable background saves (otherwise it logs
+`/etc/sysctl.d/90-steward.conf`, which Redis needs for reliable background saves (otherwise it logs
 *WARNING Memory overcommit must be enabled*). If the installer could not set it (for example inside a
 locked-down container host), run `sudo sysctl -w vm.overcommit_memory=1` and add the line to
-`/etc/sysctl.d/90-aiops.conf`. `uninstall.sh --purge` removes the file.
+`/etc/sysctl.d/90-steward.conf`. `uninstall.sh --purge` removes the file.
 
 **Workers, Runners and logs.** Tasks run in separate worker containers (`worker-default`,
 `worker-wireless`, `worker-inventory`, `worker-health`), each with its own queue, memory limit and
 read-only filesystem. **Runners** shows each worker's health, active and queued runs, failures in the
 last 24 hours, CPU/memory and the schedule for the next 24 hours. **Container logs** (admins only, every
-view is audited) follows the live logs of the AIOps containers through `logproxy`, a socket proxy that
+view is audited) follows the live logs of the Steward containers through `logproxy`, a socket proxy that
 only allows reading container information and logs.
 
-**Offline installation** (installation only; updates need GitHub): on a connected AIOps host run
-`sudo /opt/AIOps/scripts/export-bundle.sh /tmp/aiops-offline.tar`, then on the target host (Docker
-already installed): `tar -xf aiops-offline.tar && cd aiops-<version> && sudo ./install.sh --offline-bundle ../aiops-offline.tar --skip-docker-install`.
+**Offline installation** (installation only; updates need GitHub): on a connected Steward host run
+`sudo /opt/Steward/scripts/export-bundle.sh /tmp/steward-offline.tar`, then on the target host (Docker
+already installed): `tar -xf steward-offline.tar && cd steward-<version> && sudo ./install.sh --offline-bundle ../steward-offline.tar --skip-docker-install`.
 
 ## Development
 
 ```bash
 make test      # backend unit tests (against both simulated Catalyst Center releases) + frontend typecheck
-make release   # dist/aiops-<version>.tar.gz
+make release   # dist/steward-<version>.tar.gz
 make deploy HOST=root@<host> INSTALL_ARGS="--yes --build --with-mock"   # builds the images on the host
 ```
 
@@ -287,13 +294,13 @@ make deploy HOST=root@<host> INSTALL_ARGS="--yes --build --with-mock"   # builds
 
 1. Set the version in `VERSION` (and `frontend/package.json`, `backend/app/config.py`,
    the image defaults in `docker-compose.yml`).
-2. Commit, then tag and push: `git tag -a v2026.11.0 -m "AIOps 2026.11.0" && git push origin v2026.11.0`.
+2. Commit, then tag and push: `git tag -a v2026.11.0 -m "Steward 2026.11.0" && git push origin v2026.11.0`.
    Versions are year.month.revision without leading zeros (`2026.1.0` for January); the revision counts
    stable releases within the month, starting at 0. Use `v2026.11.0-dev.1`, `-dev.2`, ... for Development
    pre-releases leading up to `2026.11.0`; after that stable release the next pre-release is
    `2026.11.1-dev.1` (or `2026.12.0-dev.1` in a new month).
-3. The `release` workflow runs the tests, pushes `ghcr.io/mbechc/aiops-backend` and `aiops-web` with that
-   version, and publishes the GitHub Release with `aiops-<version>.tar.gz` and `SHA256SUMS`. Tags with a
+3. The `release` workflow runs the tests, pushes `ghcr.io/mbechc/steward-backend` and `steward-web` with that
+   version, and publishes the GitHub Release with `steward-<version>.tar.gz` and `SHA256SUMS`. Tags with a
    `-` are marked as pre-releases and only offered on the Development track.
 
 The ghcr.io packages must be public (Package settings → Change visibility) so appliances can pull without

@@ -25,7 +25,7 @@ interface SiteRow { id: string; hierarchy: string; type: string }
 async function uploadFile(sourceId: number, file: File): Promise<GeoFile> {
   const res = await fetch(`/api/sources/${sourceId}/upload${qs({ filename: file.name })}`, {
     method: "POST", credentials: "same-origin", body: file,
-    headers: { "Content-Type": "application/octet-stream", "X-AIOps": "1" },
+    headers: { "Content-Type": "application/octet-stream", "X-Steward": "1" },
   });
   const data = await res.json().catch(() => null);
   if (!res.ok) throw new Error(data?.detail || res.statusText);

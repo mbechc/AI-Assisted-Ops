@@ -125,7 +125,7 @@ function WorkerCard({ w, onRun, canLogs }: { w: RunnerWorker; onRun: (id: number
           <h3>Active</h3>
           {w.active.map((a, n) => (
             <div key={n} className="small">
-              <span className="dot warn" />{a.task === "aiops.run_task" ? "analysis" : "execution"} {a.task_key || ""}
+              <span className="dot warn" />{a.task === "steward.run_task" ? "analysis" : "execution"} {a.task_key || ""}
               {a.run_id && <button className="link small" style={{ marginLeft: 6 }} onClick={() => onRun(a.run_id!)}>run #{a.run_id}</button>}
               <span className="muted"> for {ago(a.started)}</span>
             </div>

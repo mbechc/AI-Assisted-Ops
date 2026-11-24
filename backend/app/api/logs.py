@@ -74,7 +74,7 @@ def stream(services: str = "", tail: int = 200, grep: str = "", run_id: int | No
         raise HTTPException(503, f"log access unavailable: {exc}") from exc
     unknown = [s for s in wanted if s not in containers]
     if unknown:
-        raise HTTPException(400, f"not an AIOps service: {', '.join(unknown)}")
+        raise HTTPException(400, f"not a Steward service: {', '.join(unknown)}")
     wanted = wanted[:MAX_SERVICES]
     grep_l = grep.lower()
     audit(db, admin.username, "logs.followed", "service", ",".join(wanted), tail=tail, grep=grep or None,

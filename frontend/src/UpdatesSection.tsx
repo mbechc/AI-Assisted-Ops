@@ -38,7 +38,7 @@ export default function UpdatesSection() {
     if (d.connectivity.checked_at !== refreshing.prev && !d.pending.some((p) => p.action === "check")) setRefreshing(null);
     else if (Date.now() - refreshing.since > 90000) {
       setRefreshing(null);
-      setErr("The host updater did not respond. Check that aiops-updater.path is active on the host (systemctl status aiops-updater.path).");
+      setErr("The host updater did not respond. Check that steward-updater.path is active on the host (systemctl status steward-updater.path).");
     }
   }, [d, refreshing]);
 
@@ -67,7 +67,7 @@ export default function UpdatesSection() {
       <ErrorLine error={err || st.error} />
       {d.updater_stale && (
         <div className="banner warn">
-          Requests are waiting for the host updater. Check <code>systemctl status aiops-updater.path</code> on the host.
+          Requests are waiting for the host updater. Check <code>systemctl status steward-updater.path</code> on the host.
         </div>
       )}
 
@@ -162,7 +162,7 @@ export default function UpdatesSection() {
 
       {confirmOpen && d.available && (
         <Modal onClose={() => setConfirmOpen(false)}>
-          <h2>Install AIOps {d.available.version}?</h2>
+          <h2>Install Steward {d.available.version}?</h2>
           <p>
             The host takes a backup (database and configuration), pulls the changed image layers from ghcr.io,
             runs the database migrations and restarts the services. The portal is unavailable for a few minutes.

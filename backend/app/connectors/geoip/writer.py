@@ -51,8 +51,8 @@ def encode(v) -> bytes:
     raise TypeError(f"cannot encode {type(v)}")
 
 
-def write_mmdb(path: str, networks: list[tuple[str, dict]], database_type: str = "AIOps-Location",
-               description: str = "AIOps location database") -> None:
+def write_mmdb(path: str, networks: list[tuple[str, dict]], database_type: str = "Steward-Location",
+               description: str = "Steward location database") -> None:
     """networks: [("10.1.2.0/24", {"location": "CPH-B03"}), ...]. More specific prefixes win."""
     data = bytearray()
     offsets: dict[bytes, int] = {}

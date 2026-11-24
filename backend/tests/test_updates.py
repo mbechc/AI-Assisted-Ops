@@ -23,8 +23,8 @@ def upd(tmp_path, monkeypatch):
     from app.config import get_settings
     s = get_settings()
     monkeypatch.setattr(s, "update_dir", str(tmp_path))
-    monkeypatch.setattr(s, "aiops_version", "0.2.0")
-    monkeypatch.setattr(s, "aiops_connectivity_interval_min", 15)
+    monkeypatch.setattr(s, "steward_version", "0.2.0")
+    monkeypatch.setattr(s, "steward_connectivity_interval_min", 15)
     (tmp_path / "requests").mkdir()
     return tmp_path
 
@@ -118,7 +118,7 @@ def test_api_roles_and_install(upd):
 
     write(upd, "releases.json", RELEASES)
     write(upd, "status.json", {"channel": "production", "updater_version": 1})
-    c = TestClient(app, headers={"X-AIOps": "1"})
+    c = TestClient(app, headers={"X-Steward": "1"})
     try:
         for who in ("vic", "olga"):
             as_user(who)

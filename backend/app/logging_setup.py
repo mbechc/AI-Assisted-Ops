@@ -4,7 +4,7 @@ import contextvars
 import logging
 import os
 
-_ctx: contextvars.ContextVar[dict] = contextvars.ContextVar("aiops_log_ctx", default={})
+_ctx: contextvars.ContextVar[dict] = contextvars.ContextVar("steward_log_ctx", default={})
 FORMAT = "%(asctime)s %(levelname)s [%(component)s] %(name)s%(ctx)s: %(message)s"
 
 
@@ -13,20 +13,20 @@ class _ContextFilter(logging.Filter):
         c = _ctx.get()
         record.ctx = "".join(f" {k}={v}" for k, v in c.items())
         record.component = os.environ.get("WORKER_NAME") and f"worker-{os.environ['WORKER_NAME']}" or \
-            os.environ.get("AIOPS_COMPONENT", "app")
+            os.environ.get("STEWARD_COMPONENT", "app")
         return True
 
 
 def configure_logging(level: int = logging.INFO) -> None:
     root = logging.getLogger()
-    if getattr(root, "_aiops_configured", False):
+    if getattr(root, "_steward_configured", False):
         return
     handler = logging.StreamHandler()
     handler.setFormatter(logging.Formatter(FORMAT))
     handler.addFilter(_ContextFilter())
     root.handlers = [handler]
     root.setLevel(level)
-    root._aiops_configured = True  # type: ignore[attr-defined]
+    root._steward_configured = True  # type: ignore[attr-defined]
     logging.getLogger("httpx").setLevel(logging.WARNING)
 
 

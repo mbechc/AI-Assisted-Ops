@@ -164,11 +164,14 @@ class CatalystCenter:
         """Reverse exclusions with the mechanism that created each one."""
         handles: list[TaskHandle] = []
         maint_refs = [e["ref"] for e in excluded.values() if e.get("mechanism") == "maintenance"]
-        tagged = [d for d, e in excluded.items() if e.get("mechanism") == "tag"]
+        by_tag: dict[str, list[str]] = {}
+        for d, e in excluded.items():
+            if e.get("mechanism") == "tag":
+                by_tag.setdefault(e.get("description") or tag_name, []).append(d)
         if maint_refs:
             handles += INCLUDE_BY_MECHANISM["maintenance"](self.http, maint_refs, tag_name)
-        if tagged:
-            handles += INCLUDE_BY_MECHANISM["tag"](self.http, tagged, tag_name)
+        for name, devices in by_tag.items():
+            handles += INCLUDE_BY_MECHANISM["tag"](self.http, devices, name)
         return handles
 
     def wait_all(self, handles: list[TaskHandle], timeout: float = 600) -> TaskResult:

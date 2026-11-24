@@ -26,7 +26,7 @@ WORKERS = {"default", "wireless", "inventory", "health"}
 
 class Portal:
     def __init__(self, base: str, username: str, password: str):
-        self.c = httpx.Client(base_url=base, verify=False, timeout=120, headers={"X-AIOps": "1"})
+        self.c = httpx.Client(base_url=base, verify=False, timeout=120, headers={"X-Steward": "1"})
         r = self.c.post("/api/auth/login", json={"username": username, "password": password})
         r.raise_for_status()
 
@@ -164,10 +164,10 @@ def check_platform(p: Portal, c: Check):
              f"state {ct.get('state')}/{ct.get('health')}  mem {ct.get('mem_limit')}")
     svcs = {s["service"] for s in p.get("/api/admin/logs/services")}
     c.expect({"api", "web", "postgres", "redis"} <= svcs and {f"worker-{w}" for w in WORKERS} <= svcs,
-             f"log follow lists {len(svcs)} AIOps services",
+             f"log follow lists {len(svcs)} Steward services",
              f"log follow services incomplete: {sorted(svcs)}")
     c.expect("midserver" not in " ".join(svcs) and "zabbix" not in " ".join(svcs),
-             "log follow limited to the AIOps project", "log follow exposes foreign containers")
+             "log follow limited to the Steward project", "log follow exposes foreign containers")
 
 
 def follow_run_log(p: Portal, c: Check, run: dict, worker: str, seconds: int = 8):

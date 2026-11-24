@@ -37,7 +37,7 @@ def _client(role="admin"):
     from app.main import app
     registry.load_all()
     app.dependency_overrides[current_user] = lambda: db.get(User, u.id)
-    return TestClient(app, headers={"X-AIOps": "1"}), db
+    return TestClient(app, headers={"X-Steward": "1"}), db
 
 
 def test_runners_without_docker_or_redis(monkeypatch):

@@ -1,6 +1,6 @@
 VERSION := $(shell tr -d '[:space:]' < VERSION)
-PKG := aiops-$(VERSION)
-HOST ?= root@aiops-test.example.com
+PKG := steward-$(VERSION)
+HOST ?= root@steward-test.example.com
 INSTALL_ARGS ?= --yes --build
 
 .PHONY: release test deploy clean

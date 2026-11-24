@@ -1,6 +1,6 @@
 # Roles and permissions
 
-Every AIOps user has exactly one role. Roles are ranked: **viewer < operator < admin**. A higher role can
+Every Steward user has exactly one role. Roles are ranked: **viewer < operator < admin**. A higher role can
 do everything a lower one can. Admins assign roles under **Configure → Users**.
 
 | Role | In one sentence |

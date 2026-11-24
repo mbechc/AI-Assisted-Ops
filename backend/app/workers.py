@@ -22,9 +22,9 @@ WORKERS = {
 }
 HEARTBEAT_SECONDS = 15
 HEARTBEAT_TTL = 60
-KEY = "aiops:worker:{name}"
-ACTIVE_KEY = "aiops:worker:{name}:active"
-STATS_KEY = "aiops:worker:{name}:stats"
+KEY = "steward:worker:{name}"
+ACTIVE_KEY = "steward:worker:{name}:active"
+STATS_KEY = "steward:worker:{name}:stats"
 
 
 def _redis() -> redis.Redis:
@@ -75,7 +75,7 @@ def start_heartbeat(queues: list[str], concurrency: int | None) -> None:
             n += 1
             time.sleep(HEARTBEAT_SECONDS)
 
-    threading.Thread(target=beat, name="aiops-heartbeat", daemon=True).start()
+    threading.Thread(target=beat, name="steward-heartbeat", daemon=True).start()
 
 
 def _persist(name: str, queues: list[str], started: float) -> None:

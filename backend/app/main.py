@@ -8,10 +8,10 @@ from app.logging_setup import configure_logging
 
 configure_logging()
 
-app = FastAPI(title="AIOps", version=get_settings().aiops_version, docs_url="/api/docs",
+app = FastAPI(title="Steward", version=get_settings().steward_version, docs_url="/api/docs",
               openapi_url="/api/openapi.json", redoc_url=None)
 
-CSRF_HEADER = "x-aiops"
+CSRF_HEADER = "x-steward"
 
 
 @app.middleware("http")
@@ -19,7 +19,7 @@ async def csrf_guard(request: Request, call_next):
     # A custom header cannot be set cross-site without a CORS preflight, which this API never allows.
     if request.method not in ("GET", "HEAD", "OPTIONS") and request.url.path.startswith("/api/") \
             and request.headers.get(CSRF_HEADER) != "1" and not request.headers.get("authorization"):
-        return JSONResponse({"detail": "missing X-AIOps header"}, status_code=403)
+        return JSONResponse({"detail": "missing X-Steward header"}, status_code=403)
     response = await call_next(request)
     response.headers["X-Content-Type-Options"] = "nosniff"
     response.headers["Cache-Control"] = "no-store"
@@ -33,7 +33,7 @@ def startup() -> None:
 
 @app.get("/api/health")
 def health():
-    return {"status": "ok", "version": get_settings().aiops_version}
+    return {"status": "ok", "version": get_settings().steward_version}
 
 
 for r in (auth.router, admin.router, sources.router, geoip.router, inventory.router, runners.router, logs.router,

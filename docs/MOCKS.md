@@ -1,6 +1,6 @@
 # Simulated Catalyst Centers (mocks)
 
-`--with-mock` starts two simulated Catalyst Centers next to AIOps, so you can evaluate every Expert Task
+`--with-mock` starts two simulated Catalyst Centers next to Steward, so you can evaluate every Expert Task
 without a lab. This document explains how they work, what they produce, when findings appear and what
 happens when you approve them.
 
@@ -18,7 +18,7 @@ happens when you approve them.
 ## How they work
 
 The mocks are a small web service (`backend/mockcc/`) that implements the Catalyst Center REST API calls
-AIOps uses: authentication, release detection, sites, devices, site membership, topology, AP configuration,
+Steward uses: authentication, release detection, sites, devices, site membership, topology, AP configuration,
 RF neighbours, device health, site assignment, AP rename, role change, resync, maintenance schedules, tags
 and task polling.
 
@@ -101,7 +101,7 @@ the mock and never exposed through the Catalyst Center API. The acceptance test 
 ### Test-only events
 
 Some situations only happen when something asks for them. The acceptance test
-(`scripts/acceptance-mock.sh`) uses these endpoints; you can call them yourself from `/opt/AIOps` on the
+(`scripts/acceptance-mock.sh`) uses these endpoints; you can call them yourself from `/opt/Steward` on the
 host, for example:
 
 ```bash
@@ -122,7 +122,7 @@ Apart from flapping devices and these endpoints, the mocks never create new prob
 
 ## What happens when you approve
 
-AIOps executes approved items through the same API calls it uses against a real Catalyst Center, and the
+Steward executes approved items through the same API calls it uses against a real Catalyst Center, and the
 mock applies them. The next run verifies the result:
 
 | Change | Effect in the mock | Next run |
@@ -160,20 +160,20 @@ The mocks run in the `mock` compose profile (`COMPOSE_PROFILES=mock` in `.env`).
 | `MOCK_CC_SEED` | Seed of the estate; another seed gives another estate with the same structure | `23` / `31` |
 | `MOCK_CC_APS` | Number of APs | `6000` |
 
-Each mock uses up to 768 MB of memory. Deleting a mock data source in AIOps removes its inventory data;
+Each mock uses up to 768 MB of memory. Deleting a mock data source in Steward removes its inventory data;
 it is not added again on upgrade. Remove the mocks entirely by taking `mock` out of `COMPOSE_PROFILES` and
-running `docker compose up -d --remove-orphans` in `/opt/AIOps`.
+running `docker compose up -d --remove-orphans` in `/opt/Steward`.
 
 ## Acceptance test
 
-`sudo /opt/AIOps/scripts/acceptance-mock.sh` runs every task against both mocks, scores the results
+`sudo /opt/Steward/scripts/acceptance-mock.sh` runs every task against both mocks, scores the results
 against the ground truth (for example: at most 2% wrong at confidence 95 or higher), approves a sample,
 verifies the changes in the mock and triggers the drift and name-reset events. Add `--ai-mode none`,
 `local` or `cloud` to also check that the selected AI mode is in effect.
 
 ## Limits
 
-- The mocks simulate the API responses AIOps needs, not a complete Catalyst Center.
+- The mocks simulate the API responses Steward needs, not a complete Catalyst Center.
 - There is no web UI, no real device behind them, and nothing is persisted.
 - Site renames by deleting and re-creating a site are not simulated, so the AI-assisted rename detection
   only sees plain renames in the mock.

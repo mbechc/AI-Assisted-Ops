@@ -92,7 +92,7 @@ def test_specialist_operations(mock_cc):
     broken = next(k for k, v in mock_cc.estate.telemetry_truth.items() if v in ("credential", "snmp"))
     assert health[broken]["health"] is None
 
-    tag = "AIOPS-EXCLUDED"
+    tag = "STEWARD-EXCLUDED"
     assert cc.list_excluded(tag) == {}
     assert cc.wait_all(cc.exclude_devices([sw.id], 30, "test", tag), timeout=30).success
     excluded = cc.list_excluded(tag)

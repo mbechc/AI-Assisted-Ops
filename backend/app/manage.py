@@ -72,7 +72,7 @@ def cmd_gen_cert(args) -> int:
         except ValueError:
             pass
     subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, args.hostname),
-                         x509.NameAttribute(NameOID.ORGANIZATION_NAME, "AIOps")])
+                         x509.NameAttribute(NameOID.ORGANIZATION_NAME, "Steward")])
     now = dt.datetime.now(dt.timezone.utc)
     cert = (x509.CertificateBuilder().subject_name(subject).issuer_name(subject).public_key(key.public_key())
             .serial_number(x509.random_serial_number()).not_valid_before(now - dt.timedelta(days=1))

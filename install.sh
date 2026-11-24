@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# AIOps installer. Idempotent: re-running it from a newer package upgrades in place
+# Steward installer. Idempotent: re-running it from a newer package upgrades in place
 # (keeps .env, certificates, database, model and users).
 set -eEuo pipefail
 on_error() {
@@ -31,11 +31,11 @@ usage() {
   cat <<EOF
 Usage: sudo ./install.sh [options]
 
-  --install-dir DIR       Installation directory (default /opt/AIOps)
+  --install-dir DIR       Installation directory (default /opt/Steward)
   --channel TRACK         Update track: production (default) or development
   --hostname NAME         Hostname for the TLS certificate (default: this host's FQDN)
   --admin-password PW     Initial admin password (default: generated and shown once)
-  --model TAG             Ollama model used once Local LLM is enabled in Settings (default qwen2.5:7b-instruct)
+  --model TAG             Ollama model used once Local LLM is enabled under Configure > AI assistance (default qwen2.5:7b-instruct)
   --https-port N          HTTPS port (default 443)
   --http-port N           HTTP port, redirects to HTTPS (default 80)
   --with-mock             Also run simulated Catalyst Center 2.3/3.1 for testing
@@ -62,7 +62,7 @@ while [ $# -gt 0 ]; do
       shift 2 ;;
     --offline-bundle) OFFLINE_BUNDLE="$(cd "$(dirname "$2")" && pwd)/$(basename "$2")"; shift 2 ;;
     --skip-docker-install) SKIP_DOCKER_INSTALL=1; shift ;;
-    --skip-model) c_warn "--skip-model is deprecated: the local LLM is only installed from Settings > AI assistance"; shift ;;
+    --skip-model) c_warn "--skip-model is deprecated: the local LLM is only installed from Configure > AI assistance"; shift ;;
     -y|--yes) ASSUME_YES=1; shift ;;
     -h|--help) usage; exit 0 ;;
     *) usage; die "unknown option $1" ;;
@@ -201,19 +201,19 @@ configure_env() {
     env_set POSTGRES_PASSWORD "$(rand_hex 24)"
     env_set SECRET_KEY "$(rand_hex 32)"
     env_set FERNET_KEY "$(fernet_key)"
-    env_set AIOPS_HOSTNAME "${HOSTNAME_ARG:-$(hostname -f 2>/dev/null || hostname)}"
+    env_set STEWARD_HOSTNAME "${HOSTNAME_ARG:-$(hostname -f 2>/dev/null || hostname)}"
     env_set TZ "$(timedatectl show -p Timezone --value 2>/dev/null || echo UTC)"
-    env_set COMPOSE_PROJECT_NAME aiops
+    env_set COMPOSE_PROJECT_NAME steward
   fi
   chmod 600 "$env"
   # project_name() falls back to the pre-rename name for an .env without it; make that explicit.
   [ -n "$(env_get COMPOSE_PROJECT_NAME)" ] || env_set COMPOSE_PROJECT_NAME "$(project_name)"
-  [ -n "$(env_get AIOPS_UPDATE_REPO)" ] || env_set AIOPS_UPDATE_REPO "$GITHUB_REPO"
-  [ -n "$(env_get AIOPS_UPDATE_CHANNEL)" ] || env_set AIOPS_UPDATE_CHANNEL production
-  [ -n "$CHANNEL" ] && env_set AIOPS_UPDATE_CHANNEL "$CHANNEL"
-  [ -n "$(env_get AIOPS_IMAGE_PREFIX)" ] || env_set AIOPS_IMAGE_PREFIX "ghcr.io/$(echo "${GITHUB_REPO%%/*}" | tr '[:upper:]' '[:lower:]')/aiops"
-  env_set AIOPS_VERSION "$VERSION"
-  [ -n "$HOSTNAME_ARG" ] && env_set AIOPS_HOSTNAME "$HOSTNAME_ARG"
+  [ -n "$(env_get STEWARD_UPDATE_REPO)" ] || env_set STEWARD_UPDATE_REPO "$GITHUB_REPO"
+  [ -n "$(env_get STEWARD_UPDATE_CHANNEL)" ] || env_set STEWARD_UPDATE_CHANNEL production
+  [ -n "$CHANNEL" ] && env_set STEWARD_UPDATE_CHANNEL "$CHANNEL"
+  [ -n "$(env_get STEWARD_IMAGE_PREFIX)" ] || env_set STEWARD_IMAGE_PREFIX "ghcr.io/$(echo "${GITHUB_REPO%%/*}" | tr '[:upper:]' '[:lower:]')/steward"
+  env_set STEWARD_VERSION "$VERSION"
+  [ -n "$HOSTNAME_ARG" ] && env_set STEWARD_HOSTNAME "$HOSTNAME_ARG"
   [ -n "$MODEL" ] && env_set OLLAMA_MODEL "$MODEL"
   [ -n "$HTTPS_PORT_ARG" ] && env_set HTTPS_PORT "$HTTPS_PORT_ARG"
   [ -n "$HTTP_PORT_ARG" ] && env_set HTTP_PORT "$HTTP_PORT_ARG"
@@ -239,11 +239,11 @@ open_firewall() {
 # Redis needs memory overcommit for reliable background saves. This is a host kernel setting; containers
 # cannot change it.
 tune_kernel() {
-  local conf=/etc/sysctl.d/90-aiops.conf
+  local conf=/etc/sysctl.d/90-steward.conf
   if [ "$(sysctl -n vm.overcommit_memory 2>/dev/null || echo 0)" = 1 ] && [ -f "$conf" ]; then
     return 0
   fi
-  if printf '# AIOps: Redis background saves need memory overcommit\nvm.overcommit_memory = 1\n' >"$conf" 2>/dev/null \
+  if printf '# Steward: Redis background saves need memory overcommit\nvm.overcommit_memory = 1\n' >"$conf" 2>/dev/null \
       && sysctl -q -p "$conf" >/dev/null 2>&1; then
     c_ok "Kernel: vm.overcommit_memory = 1 ($conf)"
   else
@@ -262,9 +262,9 @@ install_updater() {
   fi
   mkdir -p "$INSTALL_DIR/data/update/requests"
   chown -R 10001:10001 "$INSTALL_DIR/data/update"
-  cat >/etc/systemd/system/aiops-updater.service <<EOF
+  cat >/etc/systemd/system/steward-updater.service <<EOF
 [Unit]
-Description=AIOps updater (GitHub reachability, release lookup, updates)
+Description=Steward updater (GitHub reachability, release lookup, updates)
 After=docker.service network-online.target
 Wants=network-online.target
 
@@ -273,9 +273,9 @@ Type=oneshot
 ExecStart=$INSTALL_DIR/scripts/update.sh --process
 TimeoutStartSec=3h
 EOF
-  cat >/etc/systemd/system/aiops-updater.path <<EOF
+  cat >/etc/systemd/system/steward-updater.path <<EOF
 [Unit]
-Description=AIOps updater: requests from the portal
+Description=Steward updater: requests from the portal
 
 [Path]
 DirectoryNotEmpty=$INSTALL_DIR/data/update/requests
@@ -284,10 +284,10 @@ DirectoryNotEmpty=$INSTALL_DIR/data/update/requests
 WantedBy=multi-user.target
 EOF
   systemctl daemon-reload
-  systemctl enable aiops-updater.path >/dev/null 2>&1
-  systemctl restart aiops-updater.path
+  systemctl enable steward-updater.path >/dev/null 2>&1
+  systemctl restart steward-updater.path
   touch "$INSTALL_DIR/data/update/requests/$(date +%s%N)-check"
-  c_ok "Host updater: aiops-updater.path (systemd)"
+  c_ok "Host updater: steward-updater.path (systemd)"
 }
 
 # ------------------------------------------------------------------ images + model
@@ -298,7 +298,7 @@ load_offline_bundle() {
   c_info "Loading offline bundle $OFFLINE_BUNDLE"
   tar -xf "$OFFLINE_BUNDLE" -C "$tmp"
   docker load -i "$tmp/images.tar"
-  # Older bundles carry the model; keep it for a later Settings > AI assistance > Local LLM (never loaded now).
+  # Older bundles carry the model; keep it for a later Configure > AI assistance > Local LLM (never loaded now).
   if [ -f "$tmp/ollama-models.tgz" ] && [ ! -f "$INSTALL_DIR/data/llm/ollama-models.tgz" ]; then
     cp "$tmp/ollama-models.tgz" "$INSTALL_DIR/data/llm/ollama-models.tgz"
     c_ok "LLM model archive kept in data/llm/ (used only if Local LLM is enabled)"
@@ -307,7 +307,7 @@ load_offline_bundle() {
 }
 
 build_images() {
-  c_info "Pulling base images and building AIOps $VERSION locally"
+  c_info "Pulling base images and building Steward $VERSION locally"
   # Pull every image that is not built locally (compose < 2.22 lacks --ignore-buildable).
   compose pull --ignore-buildable 2>/dev/null || compose pull postgres redis logproxy
   compose build --pull
@@ -315,7 +315,7 @@ build_images() {
 
 # Prebuilt images from ghcr.io; on upgrades only changed layers are downloaded.
 pull_images() {
-  c_info "Pulling AIOps $VERSION images ($(env_get AIOPS_IMAGE_PREFIX)-backend, -web) and base images"
+  c_info "Pulling Steward $VERSION images ($(env_get STEWARD_IMAGE_PREFIX)-backend, -web) and base images"
   compose pull --quiet || die "image pull failed: check Internet/proxy access to ghcr.io (or use --build)"
 }
 
@@ -327,7 +327,7 @@ stop_legacy_llm() {
   ids="$(docker ps -aq --filter "label=com.docker.compose.project=$(project_name)" \
     --filter "label=com.docker.compose.service=ollama")"
   [ -n "$ids" ] || return 0
-  c_info "Stopping the local LLM container (AI is now off by default; enable it in Settings > AI assistance)"
+  c_info "Stopping the local LLM container (AI is now off by default; enable it under Configure > AI assistance)"
   # shellcheck disable=SC2086
   docker rm -f $ids >/dev/null
 }
@@ -353,7 +353,7 @@ refresh_local_llm() {
 
 main() {
   require_root
-  c_info "AIOps $VERSION installer -> $INSTALL_DIR"
+  c_info "Steward $VERSION installer -> $INSTALL_DIR"
   detect_os
   ensure_docker
   HTTPS_PORT="${HTTPS_PORT_ARG:-443}"
@@ -364,7 +364,7 @@ main() {
   preflight
 
   if [ "$ASSUME_YES" != 1 ] && [ -t 0 ]; then
-    read -r -p "Install AIOps $VERSION into $INSTALL_DIR? [Y/n] " ans
+    read -r -p "Install Steward $VERSION into $INSTALL_DIR? [Y/n] " ans
     case "${ans:-y}" in y|Y|yes) ;; *) die "aborted" ;; esac
   fi
 
@@ -383,7 +383,7 @@ main() {
   ips="$(hostname -I 2>/dev/null | tr ' ' '\n' | grep -E '^[0-9.]+$' | sed 's/^/--ip /' | tr '\n' ' ')"
   # shellcheck disable=SC2086
   compose run --rm -T --no-deps --user 0 -v "$INSTALL_DIR/certs:/certs:z" api manage gen-cert \
-    --hostname "$(env_get AIOPS_HOSTNAME)" $ips --out /certs
+    --hostname "$(env_get STEWARD_HOSTNAME)" $ips --out /certs
 
   c_info "Starting database and queue"
   compose up -d postgres redis
@@ -414,12 +414,12 @@ main() {
   fi
   refresh_local_llm
 
-  # The self-test only checks the AI provider selected in Settings (none on a fresh install).
+  # The self-test only checks the AI provider selected under Configure > AI assistance (none on a fresh install).
   "$INSTALL_DIR/scripts/healthcheck.sh" --allow-no-model || die "post-install self-test failed"
 
   echo
-  c_ok "AIOps $VERSION is installed and running."
-  echo "    URL:   https://$(env_get AIOPS_HOSTNAME):${HTTPS_PORT}/"
+  c_ok "Steward $VERSION is installed and running."
+  echo "    URL:   https://$(env_get STEWARD_HOSTNAME):${HTTPS_PORT}/"
   if [ -n "$admin_out" ]; then
     umask 077
     printf 'admin\n%s\n' "$admin_out" >"$INSTALL_DIR/initial-admin-password.txt"
@@ -428,7 +428,7 @@ main() {
   else
     echo "    Login: existing users unchanged"
   fi
-  echo "    Updates: Settings > Updates (track: $(env_get AIOPS_UPDATE_CHANNEL)). Internet access is only needed for updates."
+  echo "    Updates: Configure > Updates (track: $(env_get STEWARD_UPDATE_CHANNEL)). Internet access is only needed for updates."
 }
 
 main "$@"

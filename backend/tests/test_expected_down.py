@@ -1,5 +1,6 @@
 from app.inventory import collect
 from app.models import WorkItem
+from app.usecases.expected_down import LEGACY_TAGS
 from tests.conftest import setup_task, truth
 
 
@@ -39,7 +40,7 @@ def test_reverse_check_includes_recovered_device(mock_cc):
     noisy = set(t["expected_down"]) | set(t["flapping"]) | set(t["transient_down"])
     healthy = next(d["id"] for d in mock_cc.estate.devices
                    if d["id"] not in noisy and d["family"] == "Switches and Hubs" and d["reachabilityStatus"] == "Reachable")
-    ctx.cc.wait_all(ctx.cc.exclude_devices([healthy], 30, "manual test", "AIOPS-EXCLUDED"))
+    ctx.cc.wait_all(ctx.cc.exclude_devices([healthy], 30, "manual test", LEGACY_TAGS[0]))
     result = defn.analyze(ctx)
     inc = [p for p in result.proposals if p.action_type == "include_device"]
     assert [p.target_key for p in inc] == [healthy]

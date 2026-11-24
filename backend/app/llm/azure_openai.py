@@ -106,7 +106,7 @@ class AzureOpenAIClient:
             "messages": [{"role": "system", "content": system}, {"role": "user", "content": user}],
             "temperature": 0,
             "response_format": {"type": "json_schema",
-                                "json_schema": {"name": "aiops_result", "strict": True,
+                                "json_schema": {"name": "steward_result", "strict": True,
                                                 "schema": strict_schema(schema)}},
         }
         try:

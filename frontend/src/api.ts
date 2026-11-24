@@ -6,10 +6,10 @@ export class ApiError extends Error {
   }
 }
 
-/** The browser could not reach the AIOps API (network or VPN down, proxy page, API restarting). */
+/** The browser could not reach the Steward API (network or VPN down, proxy page, API restarting). */
 export class ConnectionError extends Error {}
 
-export const LOST_CONNECTION = "Lost connection to the AIOps platform. Check VPN or network.";
+export const LOST_CONNECTION = "Lost connection to the Steward platform. Check VPN or network.";
 const PROBE_MS = 5000;
 let online = true;
 let probeTimer: number | undefined;
@@ -19,7 +19,7 @@ export const isOnline = () => online;
 function offline(message: string): ConnectionError {
   if (online) {
     online = false;
-    window.dispatchEvent(new CustomEvent("aiops:offline", { detail: message }));
+    window.dispatchEvent(new CustomEvent("steward:offline", { detail: message }));
   }
   if (probeTimer === undefined) probeTimer = window.setInterval(probe, PROBE_MS);
   return new ConnectionError(message);
@@ -32,13 +32,13 @@ function markOnline() {
   }
   if (!online) {
     online = true;
-    window.dispatchEvent(new Event("aiops:online"));
+    window.dispatchEvent(new Event("steward:online"));
   }
 }
 
 export const APP_VERSION = __APP_VERSION__;
 const VERSION_CHECK_MS = 60000;
-const RELOADED_FOR = "aiops-reloaded-for";
+const RELOADED_FOR = "steward-reloaded-for";
 
 /** After an update the server runs a newer version than this tab: reload once to load the new UI. */
 function checkVersion(server: unknown) {
@@ -74,7 +74,7 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
     res = await fetch(`/api${path}`, {
       method,
       credentials: "same-origin",
-      headers: { "Content-Type": "application/json", "X-AIOps": "1" },
+      headers: { "Content-Type": "application/json", "X-Steward": "1" },
       body: body === undefined ? undefined : JSON.stringify(body),
     });
   } catch {
@@ -89,12 +89,12 @@ async function request<T>(method: string, path: string, body?: unknown): Promise
   // Every API reply is JSON; anything else came from nginx (API down) or from the network in between.
   if (text && !(res.headers.get("content-type") || "").includes("json")) {
     throw offline([502, 503, 504].includes(res.status)
-      ? `The AIOps platform is not responding (HTTP ${res.status}).`
+      ? `The Steward platform is not responding (HTTP ${res.status}).`
       : `${LOST_CONNECTION} (Unexpected response from the network, HTTP ${res.status}.)`);
   }
   markOnline();
   if (res.status === 401 && !path.startsWith("/auth/")) {
-    window.dispatchEvent(new Event("aiops:unauthorized"));
+    window.dispatchEvent(new Event("steward:unauthorized"));
   }
   const data = text ? JSON.parse(text) : null;
   if (!res.ok) {

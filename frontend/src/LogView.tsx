@@ -81,7 +81,7 @@ export default function LogView({ services, runId, tail = 200, short }: { servic
     const text = buf.current.map((l) => `${l.ts} [${l.service}] ${l.line}`).join("\n");
     const a = document.createElement("a");
     a.href = URL.createObjectURL(new Blob([text], { type: "text/plain" }));
-    a.download = `aiops-${runId ? `run-${runId}` : "logs"}-${new Date().toISOString().replace(/[:.]/g, "")}.log`;
+    a.download = `steward-${runId ? `run-${runId}` : "logs"}-${new Date().toISOString().replace(/[:.]/g, "")}.log`;
     a.click();
     URL.revokeObjectURL(a.href);
   };

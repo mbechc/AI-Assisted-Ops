@@ -13,6 +13,7 @@ export interface Change {
 
 // Every entry shows a dot to each user who has not opened the page since, so drop entries after a few releases.
 export const CHANGES: Change[] = [
+  { id: "2026.11-steward", path: "/", text: "AIOps is now called Steward." },
   { id: "2026.11-history", path: "/history", text: "Activity is now called History: everything that was decided or automated." },
   { id: "2026.11-task-history", path: "/runs", text: "Run history is now called Expert Task history." },
   { id: "2026.11-inbox-groups", path: "/inbox", text: "The By group table is simpler. Bulk approve and reject are in the Items tab." },
@@ -40,7 +41,7 @@ const Ctx = createContext<NewsCtx>({ hasNew: () => false, here: [] });
 export const useNews = () => useContext(Ctx);
 
 export function NewsProvider({ username, admin, children }: { username: string; admin: boolean; children: ReactNode }) {
-  const key = `aiops.seen.${username}`;
+  const key = `steward.seen.${username}`;
   const [seen, setSeen] = useState<Set<string>>(() => new Set(JSON.parse(localStorage.getItem(key) || "[]")));
   const [here, setHere] = useState<Change[]>([]);
   const { pathname } = useLocation();

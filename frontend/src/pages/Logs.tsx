@@ -33,7 +33,7 @@ export default function Logs() {
       <div className="page-head">
         <div>
           <h1>Container logs</h1>
-          <p className="sub">Live logs from the AIOps containers (read-only, through the log proxy). Admin only; every session is audited.</p>
+          <p className="sub">Live logs from the Steward containers (read-only, through the log proxy). Admin only; every session is audited.</p>
         </div>
       </div>
       <ErrorLine error={svcs.error} />

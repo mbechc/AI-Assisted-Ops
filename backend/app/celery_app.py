@@ -9,7 +9,7 @@ from app.logging_setup import configure_logging
 
 configure_logging()
 
-celery = Celery("aiops", broker=get_settings().redis_url)
+celery = Celery("steward", broker=get_settings().redis_url)
 celery.conf.update(
     task_default_queue="run.default",
     task_acks_late=True,
@@ -58,19 +58,19 @@ def _on_failure(task_id=None, exception=None, **_):
     log.error("task %s failed: %s", task_id, exception)
 
 
-@celery.task(name="aiops.run_task")
+@celery.task(name="steward.run_task")
 def run_task(run_id: int) -> None:
     from app.framework.runner import execute_run
     execute_run(run_id)
 
 
-@celery.task(name="aiops.execute_items")
+@celery.task(name="steward.execute_items")
 def execute_items_task(task_key: str, ids: list[int]) -> None:
     from app.framework.runner import execute_items
     execute_items(task_key, ids)
 
 
-@celery.task(name="aiops.dispatch")
+@celery.task(name="steward.dispatch")
 def dispatch_task(task_key: str | None = None) -> None:
     from app.framework.runner import dispatch_approved
     dispatch_approved(task_key)

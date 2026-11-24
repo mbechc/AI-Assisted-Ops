@@ -1,8 +1,8 @@
 # shellcheck shell=bash
-# Shared helpers for AIOps scripts. Source, do not execute.
+# Shared helpers for Steward scripts. Source, do not execute.
 
-INSTALL_DIR="${INSTALL_DIR:-/opt/AIOps}"
-GITHUB_REPO="${GITHUB_REPO:-mbechc/AI-Assisted-Ops}"
+INSTALL_DIR="${INSTALL_DIR:-/opt/Steward}"
+GITHUB_REPO="${GITHUB_REPO:-mbechc/Steward}"
 
 c_info() { printf '\033[1;34m==>\033[0m %s\n' "$*"; }
 c_ok()   { printf '\033[1;32m[ OK ]\033[0m %s\n' "$*"; }
@@ -18,12 +18,10 @@ env_get() {
   { grep -E "^$1=" "$INSTALL_DIR/.env" 2>/dev/null || true; } | tail -1 | cut -d= -f2-
 }
 
-# Installs from before the rename keep their project name (and with it their volumes) via .env.
 project_name() {
   local p
   p="$(env_get COMPOSE_PROJECT_NAME)"
-  if [ -z "$p" ] && [ -f "$INSTALL_DIR/.env" ]; then p=ciscoaiops; fi
-  echo "${p:-aiops}"
+  echo "${p:-steward}"
 }
 
 compose() {

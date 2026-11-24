@@ -43,7 +43,7 @@ jobs:
           {
             echo "version=$tag"
             echo "prerelease=$pre"
-            echo "prefix=ghcr.io/$owner/aiops"
+            echo "prefix=ghcr.io/$owner/steward"
           } >> "$GITHUB_OUTPUT"
 
       - uses: docker/setup-buildx-action@v3
@@ -65,7 +65,7 @@ jobs:
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.version=${{ steps.v.outputs.version }}
-            org.opencontainers.image.title=aiops-backend
+            org.opencontainers.image.title=steward-backend
           cache-from: type=gha,scope=backend
           cache-to: type=gha,scope=backend,mode=max
 
@@ -81,7 +81,7 @@ jobs:
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.version=${{ steps.v.outputs.version }}
-            org.opencontainers.image.title=aiops-web
+            org.opencontainers.image.title=steward-web
           cache-from: type=gha,scope=web
           cache-to: type=gha,scope=web,mode=max
 
@@ -89,7 +89,7 @@ jobs:
         run: |
           make release
           cd dist
-          sha256sum "aiops-${{ steps.v.outputs.version }}.tar.gz" > SHA256SUMS
+          sha256sum "steward-${{ steps.v.outputs.version }}.tar.gz" > SHA256SUMS
           cat SHA256SUMS
 
       - name: GitHub Release
@@ -100,5 +100,5 @@ jobs:
           flags="--latest"
           [ "${{ steps.v.outputs.prerelease }}" = "true" ] && flags="--prerelease --latest=false"
           # shellcheck disable=SC2086
-          gh release create "$GITHUB_REF_NAME" "dist/aiops-$v.tar.gz" dist/SHA256SUMS \
-            --title "AIOps $v" --generate-notes $flags
+          gh release create "$GITHUB_REF_NAME" "dist/steward-$v.tar.gz" dist/SHA256SUMS \
+            --title "Steward $v" --generate-notes $flags

@@ -30,7 +30,7 @@ def test_review_kpis_per_category():
 
     app.dependency_overrides[current_user] = lambda: None
     try:
-        rows = {r["key"]: r for r in TestClient(app).get("/api/items/kpis", headers={"X-AIOps": "1"}).json()}
+        rows = {r["key"]: r for r in TestClient(app).get("/api/items/kpis", headers={"X-Steward": "1"}).json()}
     finally:
         app.dependency_overrides.clear()
     assert "cc_inventory_snapshot" not in rows

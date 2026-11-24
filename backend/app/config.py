@@ -7,12 +7,12 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_file=None, extra="ignore")
 
-    aiops_version: str = "2026.11.1-dev.3"
-    aiops_hostname: str = "aiops.local"
+    steward_version: str = "2026.11.1-dev.4"
+    steward_hostname: str = "steward.local"
 
-    postgres_db: str = "aiops"
-    postgres_user: str = "aiops"
-    postgres_password: str = "aiops"
+    postgres_db: str = "steward"
+    postgres_user: str = "steward"
+    postgres_password: str = "steward"
     database_host: str = "postgres"
     database_port: int = 5432
     database_url_override: str | None = None
@@ -31,10 +31,10 @@ class Settings(BaseSettings):
     geoip_dir: str = "/data/geoip"
     logproxy_url: str = "http://logproxy:2375"
     update_dir: str = "/data/update"
-    aiops_update_repo: str = "mbechc/AI-Assisted-Ops"
-    aiops_update_channel: str = "production"
-    aiops_connectivity_interval_min: int = 15
-    compose_project: str = Field("aiops", validation_alias=AliasChoices("compose_project_name", "compose_project"))
+    steward_update_repo: str = "mbechc/Steward"
+    steward_update_channel: str = "production"
+    steward_connectivity_interval_min: int = 15
+    compose_project: str = Field("steward", validation_alias=AliasChoices("compose_project_name", "compose_project"))
 
     @property
     def database_url(self) -> str:

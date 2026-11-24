@@ -3,7 +3,7 @@ set -e
 
 case "$1" in
   api)
-    export AIOPS_COMPONENT=api
+    export STEWARD_COMPONENT=api
     exec uvicorn app.main:app --host 0.0.0.0 --port 8000 --proxy-headers --forwarded-allow-ips='*' --workers 2
     ;;
   worker)
@@ -12,7 +12,7 @@ case "$1" in
       -n "${WORKER_NAME:-default}@%h" -Q "${WORKER_QUEUES:-run.default}"
     ;;
   scheduler)
-    export AIOPS_COMPONENT=scheduler
+    export STEWARD_COMPONENT=scheduler
     exec python -m app.scheduler
     ;;
   migrate)

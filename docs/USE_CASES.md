@@ -1,10 +1,10 @@
 # Use cases: removing the repetitive 80%
 
-AIOps exists to take the repetitive, boring 80% of Catalyst Center operations off operators, so they have
+Steward exists to take the repetitive, boring 80% of Catalyst Center operations off operators, so they have
 time for the complex 20%. This page collects the recurring work operators describe in the
 [Cisco Community](https://community.cisco.com/t5/cisco-catalyst-center/bd-p/discussions-dna) and on Reddit
 ([r/networking](https://www.reddit.com/r/networking/), [r/Cisco](https://www.reddit.com/r/Cisco/)), and how
-AIOps removes it.
+Steward removes it.
 
 Every use case follows the same rules:
 
@@ -15,7 +15,7 @@ Every use case follows the same rules:
 - **Autonomy is earned.** New tasks start as L0 (report) or L1 (propose, operator approves). Higher levels
   are enabled per task once the calibration shows the proposals are right.
 
-## Already in AIOps
+## Already in Steward
 
 | Expert Task | Repetitive work it removes |
 |---|---|
@@ -41,7 +41,7 @@ Every use case follows the same rules:
 | 7 | [Stale inventory](#7-stale-inventory) | L1 propose | Medium | Low |
 | 8 | [Port and VLAN hygiene](#8-port-and-vlan-hygiene) | L0 report | Medium | Medium |
 
-Out of scope: security advisories and end-of-life reporting. Cisco IQ covers them, so AIOps does not
+Out of scope: security advisories and end-of-life reporting. Cisco IQ covers them, so Steward does not
 duplicate them.
 
 ### 1. AP uplink health
@@ -59,7 +59,7 @@ Cisco's own wireless troubleshooting tool warns on "AP interface on half duplex"
 **Why it is hard.** The port shows `connected`, the AP joins, Catalyst Center and the WLC look healthy;
 users only report "slow WiFi" in one area. Finding it means checking every AP-facing port.
 
-**How AIOps does it.** The topology gives each AP's switch and port; the interface API
+**How Steward does it.** The topology gives each AP's switch and port; the interface API
 (`GET /dna/intent/api/v1/interface/network-device/{id}`, fields `speed` and `duplex`) gives the port state.
 Half duplex, 10 Mbps or 100 Mbps on an AP-facing port becomes a report item, grouped per switch, with the
 fix: both sides on auto, or both hard-coded; then the cable and the AP. Read-only.
@@ -73,7 +73,7 @@ signal from 9130s turned out to be the PoE draw and the USB port
 Cisco TAC lists APs on too little PoE as a common issue: radios fall back or stay off
 ([Cisco](https://www.cisco.com/c/en/us/support/docs/wireless/catalyst-9100-access-points/215467-cisco-access-point-power-requirements-qu.html)).
 
-**How AIOps does it.** Compare each AP model's full-power requirement with the power the switch port
+**How Steward does it.** Compare each AP model's full-power requirement with the power the switch port
 allocates (PoE data in Catalyst Center Assurance, 2.3.6 and later). Report APs running derated, with the
 options: UPOE port, disable the AP USB port, or an injector.
 
@@ -84,7 +84,7 @@ the port and close the ticket, it stays up for a day or two and then err disable
 on for two weeks" ([r/networking](https://www.reddit.com/r/networking/comments/kurgei/esxi_host_network_err_disabled/));
 the same loop for lab ports ([r/networking](https://www.reddit.com/r/networking/comments/1phcm92/switch_port_keeps_getting_errordisabled_whats_the/)).
 
-**How AIOps does it.** Track interface state across snapshots; ports that go err-disabled repeatedly become
+**How Steward does it.** Track interface state across snapshots; ports that go err-disabled repeatedly become
 one item with the count, the cause (BPDU guard, port security, inline power) and the root-cause advice, instead of
 one ticket per occurrence.
 
@@ -97,7 +97,7 @@ APs in mobile MRI trailers alert every night
 "Device Unreachable" alerts that clear within a minute
 ([Cisco Community](https://community.cisco.com/t5/cisco-catalyst-center/excessive-device-unreachable-notifications/td-p/5337376)).
 
-**How AIOps does it.** Extends Expected-down and flapping devices: find issues that fire daily for the same
+**How Steward does it.** Extends Expected-down and flapping devices: find issues that fire daily for the same
 devices or sites, and propose an Assurance network profile or a priority change for those sites (Catalyst
 Center supports both). The operator approves; nothing is silenced automatically.
 
@@ -106,7 +106,7 @@ Center supports both). The operator approves; nothing is silenced automatically.
 **What operators say.** Startup and running configuration out of sync, then "Run Compliance, wait about 10
 minutes ... re-provision" ([Cisco Community](https://community.cisco.com/t5/cisco-catalyst-center/dnac-compliance-error-startup-vs-running-configuratio/m-p/4283918)).
 
-**How AIOps does it.** Devices non-compliant on "Startup vs Running" for more than N days, with who changed
+**How Steward does it.** Devices non-compliant on "Startup vs Running" for more than N days, with who changed
 what and when (Catalyst Center keeps the change history). Propose "write running config to startup"
 through Catalyst Center; the operator approves.
 
@@ -117,7 +117,7 @@ through Catalyst Center; the operator approves.
 "upgraded DNA center and it wiped my maps"
 ([r/networking](https://www.reddit.com/r/networking/comments/1gebtt9/has_anyone_moved_away_from_cisco_dna_center_while/)).
 
-**How AIOps does it.** APs assigned to a floor but not positioned on its map
+**How Steward does it.** APs assigned to a floor but not positioned on its map
 (`GET /dna/intent/api/v2/floors/{floorId}/accessPointPositions`), and the placed count per floor over time,
 so a drop after a Catalyst Center upgrade is caught the same day.
 
@@ -127,7 +127,7 @@ so a drop after a Catalyst Center upgrade is caught the same day.
 ([Cisco Community](https://community.cisco.com/t5/cisco-catalyst-center/dna-center-seeking-help-to-delete-a-device-that-is-not/td-p/3792173),
 [Cisco Community](https://community.cisco.com/t5/cisco-catalyst-center/dnac-2-1-2-5-cannot-delete-a-device-from-inventory/td-p/4424016)).
 
-**How AIOps does it.** Devices unreachable for more than N days and not on the expected-down list, proposed
+**How Steward does it.** Devices unreachable for more than N days and not on the expected-down list, proposed
 for removal with the clean-up steps that work (clear port assignments, remove from fabric, delete).
 
 ### 8. Port and VLAN hygiene
@@ -135,6 +135,6 @@ for removal with the clean-up steps that work (clear port assignments, remove fr
 **What operators say.** Daily work is still manual port and VLAN changes and audits
 ([r/networking](https://www.reddit.com/r/networking/comments/1e6k1uf/automation_tools_for_cisco_enterprise_networks/)).
 
-**How AIOps does it.** Access ports whose VLAN or description does not match the site standard, for example
+**How Steward does it.** Access ports whose VLAN or description does not match the site standard, for example
 AP-facing ports outside the AP VLAN or ports without a description, from the interface API
 (`vlanId`, `description`, `portMode`).

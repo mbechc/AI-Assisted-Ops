@@ -2,7 +2,7 @@
 
 * Long-down devices (e.g. a decommissioned or seasonal offshore site) and devices matching a configured
   site path or hostname prefix are excluded with a maintenance window (Catalyst Center 2.3.7.6+), falling
-  back to the AIOPS-EXCLUDED tag on older releases.
+  back to the STEWARD-EXCLUDED tag on older releases.
 * Flapping devices (repeated reachability changes in the inventory history) are excluded the same way.
 * Reverse check: excluded devices that are reachable and stable again are proposed for inclusion.
 Briefly-down devices are left alone: that is a real outage, not noise.
@@ -29,13 +29,32 @@ def _split(v) -> list[str]:
     return [x.strip() for x in str(v or "").split(",") if x.strip()]
 
 
+EXCLUSION_TAG = "STEWARD-EXCLUDED"
+# Tags written by this product under its earlier name; devices carrying them are still ours to include again.
+LEGACY_TAGS = ("AIOPS-EXCLUDED",)
+
+
+def list_excluded(cc, tag: str) -> dict[str, dict]:
+    excluded = cc.list_excluded(tag)
+    for legacy in LEGACY_TAGS:
+        if legacy == tag:
+            continue
+        try:
+            found = cc.list_excluded(legacy)
+        except Exception:  # noqa: BLE001
+            continue
+        for dev, entry in found.items():
+            if entry.get("mechanism") == "tag":
+                excluded.setdefault(dev, entry)
+    return excluded
+
 @register
 class ExpectedDown(TaskDefinition):
     key = "expected_down_devices"
     name = "Expected-down and flapping devices"
     description = ("Finds devices that have been unreachable for a long time, devices on sites or with hostname "
                    "prefixes you mark as expected-down, and devices that keep flapping. Proposes maintenance mode "
-                   "(or the AIOPS-EXCLUDED tag on older releases) via Catalyst Center, and proposes taking devices "
+                   "(or the STEWARD-EXCLUDED tag on older releases) via Catalyst Center, and proposes taking devices "
                    "out again once they are reachable and stable.")
     category = "Health / Noise reduction"
     worker = "health"
@@ -56,7 +75,7 @@ class ExpectedDown(TaskDefinition):
         ParamSpec("flap_min_changes", "Flapping: minimum reachability changes in the window", "int", 4),
         ParamSpec("stable_hours", "Reverse check: reachable and stable for (hours)", "int", 24),
         ParamSpec("maintenance_days", "Maintenance window length (days)", "int", 90),
-        ParamSpec("exclusion_tag", "Tag used when maintenance mode is not available", "str", "AIOPS-EXCLUDED"),
+        ParamSpec("exclusion_tag", "Tag used when maintenance mode is not available", "str", EXCLUSION_TAG),
         ParamSpec("task_timeout_seconds", "Catalyst Center task timeout (s)", "int", 600),
         ParamSpec("snapshot_max_age_hours", "Max inventory snapshot age (h) before collecting inline", "float", 3),
     ]
@@ -66,9 +85,9 @@ class ExpectedDown(TaskDefinition):
         inv = ensure_fresh(ctx, float(p.get("snapshot_max_age_hours", 3)))
         now = datetime.now(timezone.utc)
         site_label = {s.id: s.hierarchy for s in inv.sites}
-        tag = p.get("exclusion_tag") or "AIOPS-EXCLUDED"
+        tag = p.get("exclusion_tag") or EXCLUSION_TAG
         try:
-            excluded = ctx.cc.list_excluded(tag)
+            excluded = list_excluded(ctx.cc, tag)
         except Exception as exc:  # noqa: BLE001
             ctx.log(f"Could not read current exclusions: {exc}")
             excluded = {}
@@ -168,7 +187,7 @@ class ExpectedDown(TaskDefinition):
 
     def execute(self, ctx: RunContext, items: list[WorkItem]) -> dict[int, ExecResult]:
         cc = ctx.cc
-        tag = ctx.params.get("exclusion_tag") or "AIOPS-EXCLUDED"
+        tag = ctx.params.get("exclusion_tag") or EXCLUSION_TAG
         timeout = int(ctx.params.get("task_timeout_seconds", 600))
         results: dict[int, ExecResult] = {}
         excl = [i for i in items if i.action_type == "exclude_device"]
@@ -177,7 +196,7 @@ class ExpectedDown(TaskDefinition):
             days = int(ctx.params.get("maintenance_days", 90))
             ids = [i.payload["device_id"] for i in excl]
             try:
-                res = cc.wait_all(cc.exclude_devices(ids, days, f"AIOps: expected-down/flapping ({len(ids)})", tag),
+                res = cc.wait_all(cc.exclude_devices(ids, days, f"Steward: expected-down/flapping ({len(ids)})", tag),
                                   timeout=timeout)
             except Exception as exc:  # noqa: BLE001
                 results.update(fail_all(excl, f"exclude failed: {exc}"))
@@ -188,7 +207,7 @@ class ExpectedDown(TaskDefinition):
                     results.update(self._verify(ctx, excl, tag, expect=True))
         if incl:
             try:
-                current = cc.list_excluded(tag)
+                current = list_excluded(cc, tag)
                 subset = {i.payload["device_id"]: current[i.payload["device_id"]] for i in incl
                           if i.payload["device_id"] in current}
                 res = cc.wait_all(cc.include_devices(subset, tag), timeout=timeout) if subset else None
@@ -204,7 +223,7 @@ class ExpectedDown(TaskDefinition):
     @staticmethod
     def _verify(ctx: RunContext, items: list[WorkItem], tag: str, expect: bool) -> dict[int, ExecResult]:
         try:
-            now = ctx.cc.list_excluded(tag)
+            now = list_excluded(ctx.cc, tag)
         except Exception as exc:  # noqa: BLE001
             return {i.id: ExecResult(True, f"done (verification unavailable: {exc})", verified=None) for i in items}
         out = {}

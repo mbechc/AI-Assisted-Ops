@@ -1,15 +1,15 @@
 #!/usr/bin/env bash
-# AIOps one-line installer: finds the release for the chosen track on GitHub, verifies its checksum
-# and runs install.sh (or upgrade.sh when AIOps is already installed in the target folder).
+# Steward one-line installer: finds the release for the chosen track on GitHub, verifies its checksum
+# and runs install.sh (or upgrade.sh when Steward is already installed in the target folder).
 #
-#   curl -fsSL https://raw.githubusercontent.com/mbechc/AI-Assisted-Ops/master/get-aiops.sh | sudo bash
-#   curl -fsSL .../get-aiops.sh | sudo bash -s -- --channel development --with-mock
+#   curl -fsSL https://raw.githubusercontent.com/mbechc/Steward/master/get-steward.sh | sudo bash
+#   curl -fsSL .../get-steward.sh | sudo bash -s -- --channel development --with-mock
 #
 # Behind a proxy, export https_proxy and run with sudo -E.
 set -euo pipefail
 
-REPO="${AIOPS_REPO:-mbechc/AI-Assisted-Ops}"
-DIR=/opt/AIOps
+REPO="${STEWARD_REPO:-mbechc/Steward}"
+DIR=/opt/Steward
 CHANNEL=production
 VERSION=""
 PASS=()
@@ -19,9 +19,9 @@ die()  { printf '\033[1;31m[FAIL]\033[0m %s\n' "$*" >&2; exit 1; }
 
 usage() {
   cat <<EOF
-Usage: get-aiops.sh [options] [install.sh options]
+Usage: get-steward.sh [options] [install.sh options]
 
-  --dir DIR          Installation folder (default /opt/AIOps)
+  --dir DIR          Installation folder (default /opt/Steward)
   --channel TRACK    production (default, stable releases) or development (also pre-releases)
   --version YYYY.M.R Install this exact release instead of the newest on the track
   -h, --help         This help
@@ -70,16 +70,16 @@ main() {
   TMP="$(mktemp -d)"
   trap 'rm -rf "$TMP"' EXIT
   base="https://github.com/$REPO/releases/download/$TAG"
-  pkg="aiops-$VERSION.tar.gz"
+  pkg="steward-$VERSION.tar.gz"
 
-  info "AIOps $VERSION ($CHANNEL track) from github.com/$REPO"
+  info "Steward $VERSION ($CHANNEL track) from github.com/$REPO"
   curl -fSL --retry 3 --connect-timeout 15 -o "$TMP/$pkg" "$base/$pkg" || die "download of $pkg failed"
   curl -fsSL --retry 3 --connect-timeout 15 -o "$TMP/SHA256SUMS" "$base/SHA256SUMS" || die "download of SHA256SUMS failed"
   (cd "$TMP" && grep " $pkg\$" SHA256SUMS | sha256sum -c --quiet -) || die "checksum mismatch for $pkg"
   info "Checksum verified"
 
   tar -xzf "$TMP/$pkg" -C "$TMP"
-  src="$TMP/aiops-$VERSION"
+  src="$TMP/steward-$VERSION"
   if [ -f "$DIR/.env" ]; then
     info "Existing installation in $DIR: upgrading (backup first)"
     "$src/upgrade.sh" --install-dir "$DIR" --channel "$CHANNEL" "${PASS[@]}" </dev/null

@@ -22,10 +22,10 @@ export function useAsync<T>(fn: () => Promise<T>, deps: unknown[], pollMs?: numb
   }, deps);
   useEffect(() => {
     load();
-    window.addEventListener("aiops:online", load);
+    window.addEventListener("steward:online", load);
     const t = pollMs ? setInterval(load, pollMs) : undefined;
     return () => {
-      window.removeEventListener("aiops:online", load);
+      window.removeEventListener("steward:online", load);
       if (t) clearInterval(t);
     };
   }, [load, pollMs]);

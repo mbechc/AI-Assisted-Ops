@@ -23,7 +23,7 @@ export default function Automation() {
 
   return (
     <>
-      <div className="page-head"><div><h1>Automation</h1><p className="sub">How much AIOps may change on its own, for every Expert Task.</p></div></div>
+      <div className="page-head"><div><h1>Automation</h1><p className="sub">How much Steward may change on its own, for every Expert Task.</p></div></div>
       <ErrorLine error={err || s.error} />
       {s.data && (
         <div className="grid cols-2">

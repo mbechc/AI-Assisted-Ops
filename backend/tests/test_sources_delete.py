@@ -39,7 +39,7 @@ def _client(name):
         with SessionLocal() as db:
             return db.query(User).filter_by(username=name).one()
     app.dependency_overrides[current_user] = dep
-    return app, TestClient(app, headers={"X-AIOps": "1"})
+    return app, TestClient(app, headers={"X-Steward": "1"})
 
 
 def test_delete_source_closes_open_items_and_keeps_history():

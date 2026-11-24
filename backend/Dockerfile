@@ -6,16 +6,16 @@ ENV PYTHONPATH=/app \
     PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
 
-RUN groupadd -g 10001 aiops && useradd -u 10001 -g aiops -m -d /home/aiops aiops
+RUN groupadd -g 10001 steward && useradd -u 10001 -g steward -m -d /home/steward steward
 
 WORKDIR /app
 COPY requirements.txt .
 RUN pip install -r requirements.txt
 
 COPY . .
-RUN chmod +x /app/docker-entrypoint.sh && mkdir -p /data/fixtures && chown -R aiops:aiops /data
+RUN chmod +x /app/docker-entrypoint.sh && mkdir -p /data/fixtures && chown -R steward:steward /data
 
-USER aiops
+USER steward
 EXPOSE 8000
 ENTRYPOINT ["/app/docker-entrypoint.sh"]
 CMD ["api"]

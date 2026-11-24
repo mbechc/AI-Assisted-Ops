@@ -11,3 +11,6 @@ __pycache__/
 .venv/
 .pytest_cache/
 .DS_Store
+
+# Office lock files
+docs/~$*

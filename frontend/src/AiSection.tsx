@@ -115,7 +115,7 @@ export default function AiSection() {
       <ErrorLine error={err || st.error} />
       {local.updater_stale && (
         <div className="banner warn">
-          Requests are waiting for the host updater. Check <code>systemctl status aiops-updater.path</code> on the host.
+          Requests are waiting for the host updater. Check <code>systemctl status steward-updater.path</code> on the host.
         </div>
       )}
 

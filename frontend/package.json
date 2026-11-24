@@ -1,7 +1,7 @@
 {
-  "name": "aiops-web",
+  "name": "steward-web",
   "private": true,
-  "version": "2026.11.1-dev.3",
+  "version": "2026.11.1-dev.4",
   "type": "module",
   "scripts": {
     "dev": "vite",

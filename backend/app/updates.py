@@ -142,14 +142,14 @@ def llm_log_tail(lines: int = 200) -> str:
 
 def connectivity(now: datetime | None = None) -> dict:
     now = now or datetime.now(timezone.utc)
-    interval = max(1, get_settings().aiops_connectivity_interval_min)
+    interval = max(1, get_settings().steward_connectivity_interval_min)
     stale_after = timedelta(minutes=max(30, 2 * interval))
     c = _read("connectivity.json") or {}
     checked = _ts(c.get("checked_at"))
     endpoints = c.get("endpoints") or []
     failed = [e.get("host") for e in endpoints if not e.get("ok")]
     if checked is None:
-        status, reason = "unknown", "The host updater has not reported yet (is aiops-updater.path installed?)."
+        status, reason = "unknown", "The host updater has not reported yet (is steward-updater.path installed?)."
     elif now - checked > stale_after:
         status, reason = "unknown", f"No result from the host updater for {int((now - checked).total_seconds() // 60)} minutes."
     else:
@@ -164,8 +164,8 @@ def state() -> dict:
     host = _read("status.json") or {}
     meta = _read("releases-meta.json") or {}
     install = _read("install.json")
-    current = s.aiops_version
-    channel = host.get("channel") if host.get("channel") in CHANNELS else s.aiops_update_channel
+    current = s.steward_version
+    channel = host.get("channel") if host.get("channel") in CHANNELS else s.steward_update_channel
     queued = pending()
     channel_pending = next((p["action"].split("-", 1)[1] for p in reversed(queued)
                             if p["action"].startswith("channel-")), None)
@@ -176,7 +176,7 @@ def state() -> dict:
         "current_version": current,
         "channel": channel,
         "channel_pending": channel_pending,
-        "repo": host.get("repo") or s.aiops_update_repo,
+        "repo": host.get("repo") or s.steward_update_repo,
         "connectivity": connectivity(),
         "releases_checked_at": meta.get("checked_at"),
         "releases_error": meta.get("error"),
@@ -202,7 +202,7 @@ def schedule_host_checks(now: datetime | None = None) -> list[str]:
         queue("check")
         return ["check"]
     checked = _ts((_read("connectivity.json") or {}).get("checked_at"))
-    if checked is None or now - checked >= timedelta(minutes=max(1, get_settings().aiops_connectivity_interval_min)):
+    if checked is None or now - checked >= timedelta(minutes=max(1, get_settings().steward_connectivity_interval_min)):
         queue("connectivity")
         return ["connectivity"]
     return []

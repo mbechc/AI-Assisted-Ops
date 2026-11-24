@@ -118,7 +118,7 @@ def _client(role="admin"):
     db.commit()
     registry.load_all()
     app.dependency_overrides[current_user] = lambda: db.get(User, u.id)
-    return TestClient(app, headers={"X-AIOps": "1"}), db
+    return TestClient(app, headers={"X-Steward": "1"}), db
 
 
 def test_ai_settings_api_local_lifecycle(update_dir):

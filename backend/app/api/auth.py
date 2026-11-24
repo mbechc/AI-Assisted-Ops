@@ -44,7 +44,7 @@ def _redis() -> redis.Redis:
 @router.post("/login")
 def login(body: LoginIn, request: Request, response: Response, db: Session = Depends(get_db)):
     ip = request.client.host if request.client else "unknown"
-    key = f"aiops:loginfail:{ip}"
+    key = f"steward:loginfail:{ip}"
     r = _redis()
     if int(r.get(key) or 0) >= MAX_FAILURES:
         raise HTTPException(429, "too many failed logins, try again later")

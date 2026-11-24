@@ -23,7 +23,7 @@ export default function Login({ onLogin }: { onLogin: (u: User) => void }) {
 
   return (
     <div className="login card">
-      <h1>AIOps</h1>
+      <h1>Steward</h1>
       <p className="sub" style={{ marginBottom: 16 }}>Sign in to review and automate operational tasks.</p>
       <form method="post" action="/login" onSubmit={submit}>
         <label className="field">

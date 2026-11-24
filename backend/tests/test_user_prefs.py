@@ -20,7 +20,7 @@ def test_theme_is_saved_per_user():
                 return db.query(User).filter_by(username=name).one()
         app.dependency_overrides[current_user] = dep
 
-    c = TestClient(app, headers={"X-AIOps": "1"})
+    c = TestClient(app, headers={"X-Steward": "1"})
     try:
         as_user("alice")
         assert c.get("/api/auth/me").json()["theme"] == "dark"

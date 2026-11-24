@@ -2,7 +2,7 @@
 # Host-side updater. Runs as root on the Linux host, never in a container, so every test uses the
 # host's own DNS, proxy and firewall path (the same path docker pull and the download use).
 #
-#   --process               handle requests queued by the portal (run by aiops-updater.service)
+#   --process               handle requests queued by the portal (run by steward-updater.service)
 #   --check                 GitHub reachability test plus release lookup
 #   --connectivity          reachability test only (Dashboard: Connected / AirGapped)
 #   --channel TRACK         switch the update track: production or development
@@ -16,14 +16,14 @@
 # data/update/{status,install,connectivity,releases-meta,llm}.json, releases.json, update.log and llm.log.
 set -euo pipefail
 
-if [ "${AIOPS_UPDATER_COPY:-}" != 1 ]; then
+if [ "${STEWARD_UPDATER_COPY:-}" != 1 ]; then
   # An install replaces this file while it runs and bash reads scripts lazily: run from a copy.
   INSTALL_DIR="${INSTALL_DIR:-$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)}"
-  copy="$(mktemp /tmp/aiops-update.XXXXXX)"
+  copy="$(mktemp /tmp/steward-update.XXXXXX)"
   cp "${BASH_SOURCE[0]}" "$copy"
-  AIOPS_UPDATER_COPY=1 AIOPS_UPDATER_SELF="$copy" INSTALL_DIR="$INSTALL_DIR" exec bash "$copy" "$@"
+  STEWARD_UPDATER_COPY=1 STEWARD_UPDATER_SELF="$copy" INSTALL_DIR="$INSTALL_DIR" exec bash "$copy" "$@"
 fi
-trap 'rm -f "$AIOPS_UPDATER_SELF"' EXIT
+trap 'rm -f "$STEWARD_UPDATER_SELF"' EXIT
 # shellcheck source=scripts/lib.sh
 . "$INSTALL_DIR/scripts/lib.sh"
 require_root
@@ -32,7 +32,7 @@ require_root
 UPDATER_VERSION=1
 UPD="$INSTALL_DIR/data/update"
 REQ="$UPD/requests"
-REPO="$(env_get AIOPS_UPDATE_REPO)"; REPO="${REPO:-$GITHUB_REPO}"
+REPO="$(env_get STEWARD_UPDATE_REPO)"; REPO="${REPO:-$GITHUB_REPO}"
 OVERRIDE=()
 
 for v in HTTPS_PROXY https_proxy HTTP_PROXY http_proxy NO_PROXY no_proxy; do
@@ -81,7 +81,7 @@ version_gt() {
 
 write_status() {
   write_file "$UPD/status.json" <<EOF
-{"updated_at": "$(now_iso)", "current_version": $(jstr "$(env_get AIOPS_VERSION)"), "channel": $(jstr "$(env_get AIOPS_UPDATE_CHANNEL)"), "repo": $(jstr "$REPO"), "updater_version": $UPDATER_VERSION}
+{"updated_at": "$(now_iso)", "current_version": $(jstr "$(env_get STEWARD_VERSION)"), "channel": $(jstr "$(env_get STEWARD_UPDATE_CHANNEL)"), "repo": $(jstr "$REPO"), "updater_version": $UPDATER_VERSION}
 EOF
 }
 
@@ -139,7 +139,7 @@ connectivity() {
     dl="$(probe downloads "https://github.com/$REPO/releases/latest/download/SHA256SUMS" follow)"
     case "$dl" in *'"error": "HTTP 404"'*) dl="$(probe objects.githubusercontent.com https://objects.githubusercontent.com/ any)" ;; esac
     eps+=("$dl")
-    prefix="$(env_get AIOPS_IMAGE_PREFIX)"; prefix="${prefix:-ghcr.io/mbechc/aiops}"
+    prefix="$(env_get STEWARD_IMAGE_PREFIX)"; prefix="${prefix:-ghcr.io/mbechc/steward}"
     image="${prefix#*/}-backend"
     e="$(probe "${prefix%%/*}" "https://${prefix%%/*}/token?scope=repository:${image}:pull&service=${prefix%%/*}" ok2xx)"
     case "$e" in
@@ -185,7 +185,7 @@ check() {
 
 set_channel() {
   case "$1" in production|development) ;; *) die "track must be production or development" ;; esac
-  env_set AIOPS_UPDATE_CHANNEL "$1"
+  env_set STEWARD_UPDATE_CHANNEL "$1"
   write_status
   log "track set to $1"
 }
@@ -193,7 +193,7 @@ set_channel() {
 install_version() {
   local v="$1" cur work base pkg rc=0
   valid_version "$v" || { install_state failed "$v" "invalid version"; return 1; }
-  cur="$(env_get AIOPS_VERSION)"
+  cur="$(env_get STEWARD_VERSION)"
   if ! version_gt "$v" "$cur"; then
     install_state failed "$v" "$v is not newer than the installed $cur"
     return 1
@@ -202,18 +202,18 @@ install_version() {
   : >"$UPD/update.log"
   chmod 644 "$UPD/update.log"
   work="$(mktemp -d)"
-  pkg="aiops-$v.tar.gz"
+  pkg="steward-$v.tar.gz"
   base="https://github.com/$REPO/releases/download/v$v"
   (
     set -e
-    echo "Updating AIOps $cur -> $v ($(now_iso))"
+    echo "Updating Steward $cur -> $v ($(now_iso))"
     echo "==> Downloading $pkg"
     curl -fSL --retry 3 --connect-timeout 15 -o "$work/$pkg" "$base/$pkg"
     curl -fsSL --retry 3 --connect-timeout 15 -o "$work/SHA256SUMS" "$base/SHA256SUMS"
     (cd "$work" && grep " $pkg\$" SHA256SUMS | sha256sum -c -)
     tar -xzf "$work/$pkg" -C "$work"
     echo "==> Running upgrade.sh (backup, pull changed image layers, migrate, restart)"
-    "$work/aiops-$v/upgrade.sh" --install-dir "$INSTALL_DIR"
+    "$work/steward-$v/upgrade.sh" --install-dir "$INSTALL_DIR"
   ) >>"$UPD/update.log" 2>&1 || rc=$?
   rm -rf "$work"
   if [ "$rc" -eq 0 ]; then
@@ -336,7 +336,7 @@ while [ $# -gt 0 ]; do
       case "${2:-}" in enable|disable|remove) ;; *) die "--llm must be enable, disable or remove" ;; esac
       ACTION=llm; ARG="$2"; shift 2 ;;
     --endpoints-override) OVERRIDE+=("$2"); shift 2 ;;
-    -h|--help) sed -n '2,15p' "$AIOPS_UPDATER_SELF" | sed 's/^# \{0,1\}//'; exit 0 ;;
+    -h|--help) sed -n '2,15p' "$STEWARD_UPDATER_SELF" | sed 's/^# \{0,1\}//'; exit 0 ;;
     *) die "unknown option $1" ;;
   esac
 done

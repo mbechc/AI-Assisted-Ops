@@ -159,7 +159,7 @@ def connector_kinds(_=Depends(current_user)):
 def system_status(db: Session = Depends(get_db), _=Depends(current_user)):
     s = get_settings()
     r = redis.Redis.from_url(s.redis_url)
-    hb = r.get("aiops:scheduler:heartbeat")
+    hb = r.get("steward:scheduler:heartbeat")
     workers = {}
     try:
         from app.celery_app import celery
@@ -168,7 +168,7 @@ def system_status(db: Session = Depends(get_db), _=Depends(current_user)):
         pass
     provider = get_provider(db)
     return {
-        "version": s.aiops_version,
+        "version": s.steward_version,
         "ai_mode": effective_mode(db),
         "llm": provider.status() if provider else {"provider": None, "ready": False},
         "scheduler_alive": bool(hb and time.time() - float(hb) < 180),

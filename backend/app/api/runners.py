@@ -73,10 +73,10 @@ def runners(db: Session = Depends(get_db), _=Depends(current_user)):
         active = []
         for a in w["active"]:
             args = a.get("args") or []
-            run = run_by_id.get(args[0]) if a.get("task") == "aiops.run_task" and args else None
+            run = run_by_id.get(args[0]) if a.get("task") == "steward.run_task" and args else None
             active.append({"task": a.get("task"), "started": a.get("started"),
                            "run_id": run.id if run else None, "task_key": run.task_key if run else (
-                               args[0] if a.get("task") == "aiops.execute_items" and args else None)})
+                               args[0] if a.get("task") == "steward.execute_items" and args else None)})
         queued = [{"run_id": r.id, "task_key": r.task_key, "created_at": r.created_at}
                   for r in open_runs if r.status == "queued" and worker_of.get(r.task_key) == w["name"]]
         hb = persisted.get(w["name"])
@@ -111,7 +111,7 @@ def runners(db: Session = Depends(get_db), _=Depends(current_user)):
     hb = None
     try:
         r = redis.Redis.from_url(get_settings().redis_url, socket_timeout=3)
-        hb = r.get("aiops:scheduler:heartbeat")
+        hb = r.get("steward:scheduler:heartbeat")
         legacy = {q: r.llen(q) for q in ("default", "execute")}
     except Exception:  # noqa: BLE001
         legacy = {}

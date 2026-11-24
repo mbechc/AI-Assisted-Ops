@@ -61,7 +61,7 @@ def main() -> None:
         try:
             tick()
             HEARTBEAT.write_text(str(time.time()))
-            redis.Redis.from_url(get_settings().redis_url).set("aiops:scheduler:heartbeat", str(time.time()), ex=600)
+            redis.Redis.from_url(get_settings().redis_url).set("steward:scheduler:heartbeat", str(time.time()), ex=600)
         except Exception:  # noqa: BLE001
             log.exception("scheduler tick failed")
         try:

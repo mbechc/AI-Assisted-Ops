@@ -1,6 +1,6 @@
 export type Theme = "dark" | "light";
 
-const KEY = "aiops-theme";
+const KEY = "steward-theme";
 
 export function applyTheme(theme: Theme) {
   document.documentElement.dataset.theme = theme;

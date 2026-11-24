@@ -8,7 +8,7 @@ from app.db import SessionLocal
 from app.models import User
 from app.security import ROLE_RANK, decode_session_token
 
-SESSION_COOKIE = "aiops_session"
+SESSION_COOKIE = "steward_session"
 
 
 def get_db() -> Iterator[Session]:

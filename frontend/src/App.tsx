@@ -57,11 +57,11 @@ export default function App() {
       if (userRef.current === undefined) me();
     };
     const h = () => setUser(null);
-    window.addEventListener("aiops:unauthorized", h);
-    window.addEventListener("aiops:online", retryMe);
+    window.addEventListener("steward:unauthorized", h);
+    window.addEventListener("steward:online", retryMe);
     return () => {
-      window.removeEventListener("aiops:unauthorized", h);
-      window.removeEventListener("aiops:online", retryMe);
+      window.removeEventListener("steward:unauthorized", h);
+      window.removeEventListener("steward:online", retryMe);
     };
   }, []);
 
@@ -89,8 +89,8 @@ function Unreachable() {
   const [busy, setBusy] = useState(false);
   return (
     <div className="login card">
-      <h1>AIOps</h1>
-      <p className="err" style={{ marginBottom: 12 }}>Cannot reach the AIOps platform.</p>
+      <h1>Steward</h1>
+      <p className="err" style={{ marginBottom: 12 }}>Cannot reach the Steward platform.</p>
       <p className="sub" style={{ marginBottom: 16 }}>Check VPN or network. Retrying automatically...</p>
       <button disabled={busy} onClick={() => { setBusy(true); probe().finally(() => setBusy(false)); }}>
         {busy ? "Checking..." : "Retry now"}
@@ -105,11 +105,11 @@ function ConnectionBanner() {
   useEffect(() => {
     const down = (e: Event) => setMessage((e as CustomEvent<string>).detail || LOST_CONNECTION);
     const up = () => setMessage(null);
-    window.addEventListener("aiops:offline", down);
-    window.addEventListener("aiops:online", up);
+    window.addEventListener("steward:offline", down);
+    window.addEventListener("steward:online", up);
     return () => {
-      window.removeEventListener("aiops:offline", down);
-      window.removeEventListener("aiops:online", up);
+      window.removeEventListener("steward:offline", down);
+      window.removeEventListener("steward:online", up);
     };
   }, []);
   if (!message) return null;
@@ -153,7 +153,7 @@ function ShellBody() {
     <div className="layout">
       <aside className="sidebar">
         <div className="brand">
-          AIOps
+          Steward
           <small>IT Operations Assistant</small>
         </div>
         <nav className="nav">

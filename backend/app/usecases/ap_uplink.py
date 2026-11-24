@@ -5,7 +5,7 @@ stays up, so nothing alarms, but clients get poor throughput and the fault is ha
 
 The task maps every AP to its switch port with the Catalyst Center physical topology and reads only those
 switches' interfaces from the Catalyst Center interface API. Findings go to a report grouped per switch;
-AIOps never changes switch ports.
+Steward never changes switch ports.
 """
 import re
 from collections import Counter
@@ -48,7 +48,7 @@ class ApUplinkHealth(TaskDefinition):
     name = "AP uplink health"
     description = ("Finds access points whose switch port runs half duplex or below the expected speed "
                    "(the classic 100 Mbit half duplex AP). Reads the switch interfaces through the Catalyst "
-                   "Center API and reports per switch; AIOps does not change switch ports.")
+                   "Center API and reports per switch; Steward does not change switch ports.")
     category = "Wireless / Health"
     worker = "health"
     default_cron = "50 */6 * * *"
@@ -135,7 +135,7 @@ class ApUplinkHealth(TaskDefinition):
             evidence=[{"signal": cls, "label": LABELS[cls], "available": True, "weight": 1.0, "detail": text,
                        "buildings": [], "floors": [], "agrees": True}],
             rationale=f"{ADVICE[cls]} {text}",
-            blocked_reason="Owner action needed: AIOps does not change switch ports.",
+            blocked_reason="Owner action needed: Steward does not change switch ports.",
             group_label=sw.hostname,
             fingerprint=f"{cls}:{ap.id}:{sw.id}:{intf.name}:{intf.speed_mbps}:{intf.duplex}",
         )

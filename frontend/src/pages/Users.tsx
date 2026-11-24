@@ -48,7 +48,7 @@ export default function Users() {
       <div className="page-head">
         <div><h1>Users</h1><p className="sub">
           Viewer: read only. Operator: decides in the Inbox. Admin: everything, including Configure, Container logs and the
-          Audit log. See <a href="https://github.com/mbechc/AI-Assisted-Ops/blob/master/docs/PERMISSIONS.md" target="_blank" rel="noreferrer">Roles and permissions</a>.
+          Audit log. See <a href="https://github.com/mbechc/Steward/blob/master/docs/PERMISSIONS.md" target="_blank" rel="noreferrer">Roles and permissions</a>.
         </p></div>
         <button className="primary" onClick={() => setForm({ username: "", password: "", role: "operator" })}>Add user</button>
       </div>

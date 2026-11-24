@@ -1,6 +1,6 @@
-# How AIOps uses AI
+# How Steward uses AI
 
-AIOps is built around **Expert Tasks**: rules that read Catalyst Center evidence (CDP/LLDP neighbours, RF
+Steward is built around **Expert Tasks**: rules that read Catalyst Center evidence (CDP/LLDP neighbours, RF
 neighbours, naming, subnets, inventory history, optional GeoIP) and make proposals with a confidence score
 and the evidence behind them. **Every task works fully without AI.** AI is an optional assistant that you
 can switch on for a second opinion and for the jobs rules handle poorly: irregular naming, ambiguous
@@ -91,7 +91,7 @@ works, and what you get without AI.
   when the name does not contain the building name, or odd templates like `dk_cph_3sal_ap7_n`.
 - **Why**: the rule-based name model only learns prefixes and simple prefix-plus-number patterns.
 - **How**: one call per run sends a sample of names with their known sites. The AI returns a regular
-  expression with named groups and an alias table. AIOps then **tests it against every device with a known
+  expression with named groups and an alias table. Steward then **tests it against every device with a known
   site** and only uses it if it rebuilds at least **95%** of them (and at least 10 devices). Unsafe or overly
   complex regular expressions are rejected. The learned convention is one more signal (weight 0.10, capped
   at 0.15); a proposal supported only by it is capped at confidence 60 and never executed automatically.
@@ -164,7 +164,7 @@ label.
 
 1. **Off by default.** Nothing is downloaded or sent until an admin chooses a mode. Every mode change is
    audited (`settings.ai_updated`), without secrets.
-2. **AI cannot act.** AI has no tools and no access to Catalyst Center. It returns JSON that AIOps checks;
+2. **AI cannot act.** AI has no tools and no access to Catalyst Center. It returns JSON that Steward checks;
    only the rules and your autonomy settings decide what is executed.
 3. **Bounded influence.** Confidence: down freely, up by at most 5. AI-only evidence: capped at 60 and
    never automatic. Suggestions: advice only.
@@ -238,7 +238,7 @@ API, only for proposals approved by a person or by your autonomy settings.
 observed in Catalyst Center, and AI can raise confidence by at most 5 points.
 
 **Is Microsoft Copilot supported?** Copilot has no API for appliances. Azure OpenAI is Microsoft's
-enterprise service for the same model family and is what AIOps uses.
+enterprise service for the same model family and is what Steward uses.
 
 **Can I use OpenAI.com or another provider?** Not today. The provider layer is pluggable, so others can be
 added.
@@ -247,7 +247,7 @@ added.
 items show *AI unavailable*, and tasks continue on rules. **Test connection** shows the error.
 
 **How do I install the Local LLM without Internet?** Export a bundle on a connected host with the model
-(`scripts/export-bundle.sh`), copy `ollama-models.tgz` to `/opt/AIOps/data/llm/`, then select Local LLM.
+(`scripts/export-bundle.sh`), copy `ollama-models.tgz` to `/opt/Steward/data/llm/`, then select Local LLM.
 
 **Where do I see what AI did?** The review drawer shows the AI review per item (Local or Cloud), run logs
 show AI calls and validations, and the audit log records mode changes and on-demand AI summaries.
