@@ -186,6 +186,7 @@ def state() -> dict:
         "pending": queued,
         "updater_stale": any(p["age_seconds"] > UPDATER_STALE_SECONDS for p in queued),
         "updater_installed": host.get("updater_version") is not None,
+        "disk": host.get("disk") if isinstance(host.get("disk"), dict) else None,
     }
 
 

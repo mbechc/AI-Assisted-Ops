@@ -90,8 +90,8 @@ The installer installs Docker Engine and the compose plugin from Docker's reposi
 | Disk | 100 GB SSD under the Docker root (`/var/lib/docker`) | 200 GB SSD |
 
 The local LLM runs on the CPU, so more cores means faster reviews; size the VM for Local LLM if you may
-turn it on later. The sizes leave room for more use cases and Catalyst Centers, image versions kept for
-rollback, database growth and 14 days of backups.
+turn it on later. The sizes leave room for more use cases and Catalyst Centers, database growth and 14 days of
+backups.
 
 Network: HTTPS from the host to your Catalyst Center(s), to GitHub for installation and updates
 (see [Updates](#updates)) and, with Azure OpenAI, to your Azure OpenAI endpoint.
@@ -217,6 +217,12 @@ log is shown live in the portal. Open browser tabs reload by themselves when the
 version than the tab (checked when the API comes back after the restart, and every minute), so nobody keeps
 working in the old UI. Tabs opened before 2026.11.1-dev.3 need one manual reload.
 
+Disk space: before an update starts, the images of every Steward version except the installed one are
+removed, and after a successful update only the new version's images are kept (other images on the host and
+all volumes are left alone). An update needs at least 5 GB free under the Docker root; a fresh install needs
+20 GB. The Updates page shows the free space and warns below 10 GB. If an update is refused, the message
+names the largest users; `docker image prune -a` frees the images no container uses.
+
 Updates are online only. The host must reach:
 
 | Host | Used for |
@@ -246,8 +252,9 @@ sudo /opt/Steward/scripts/update.sh --channel development
 sudo /opt/Steward/scripts/update.sh --version 2026.11.0
 ```
 
-**Rollback**: restore the backup taken right before the update without migrating it, then install the
-previous release:
+**Rollback** (from the shell only): restore the backup taken right before the update without migrating it,
+then install the previous release. Everything recorded since the update is lost, and the host needs access to
+GitHub and ghcr.io, because the previous release's images are pulled again:
 
 ```bash
 sudo /opt/Steward/scripts/restore.sh --no-migrate /opt/Steward/backups/db-<timestamp>.sql.gz

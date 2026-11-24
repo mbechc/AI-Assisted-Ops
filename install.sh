@@ -144,17 +144,20 @@ port_in_use() {
 }
 
 preflight() {
-  local cores mem_gb disk_gb root
+  local cores mem_gb disk_gb root min_free=$FRESH_MIN_FREE_GB what=""
   cores="$(nproc)"
   mem_gb=$(( $(awk '/MemTotal/ {print $2}' /proc/meminfo) / 1024 / 1024 ))
-  root="$(docker info --format '{{.DockerRootDir}}' 2>/dev/null || echo /var/lib/docker)"
+  root="$(docker_root)"
   mkdir -p "$root"
-  disk_gb=$(( $(df -Pk "$root" | awk 'NR==2 {print $4}') / 1024 / 1024 ))
+  disk_gb="$(df_gb "$root")"
+  # An upgrade only needs room for the changed image layers and one backup.
+  if [ -f "$INSTALL_DIR/.env" ]; then min_free=$UPGRADE_MIN_FREE_GB; what=" for an upgrade"; fi
 
   # Hard floor: below this the stack cannot run at all. The supported size is in README.md.
   [ "$cores" -ge 4 ] || die "at least 4 CPU cores required (found $cores)"
   [ "$mem_gb" -ge 15 ] || die "at least 16 GB RAM required (found ${mem_gb} GB)"
-  [ "$disk_gb" -ge 20 ] || die "at least 20 GB free disk in $root required (found ${disk_gb} GB)"
+  [ "$disk_gb" -ge "$min_free" ] ||
+    die "at least $min_free GB free disk in $root required$what (found ${disk_gb} GB). $(disk_hint)"
   # Supported sizes: No AI / Azure OpenAI 8 vCPU, 16 GB, 100 GB; Local LLM 16 vCPU, 64 GB, 200 GB.
   # MemTotal is reported slightly below the installed size.
   if [ "$cores" -ge 16 ] && [ "$mem_gb" -ge 60 ] && [ "$disk_gb" -ge 200 ]; then
@@ -384,6 +387,10 @@ main() {
   check_terms
   detect_os
   ensure_docker
+  PREV_VERSION="$(env_get STEWARD_VERSION)"
+  if [ -n "$PREV_VERSION" ] && [ "$BUILD_LOCAL" != 1 ] && [ -z "$OFFLINE_BUNDLE" ]; then
+    prune_images "$PREV_VERSION"
+  fi
   HTTPS_PORT="${HTTPS_PORT_ARG:-443}"
   HTTP_PORT="${HTTP_PORT_ARG:-80}"
   if [ -f "$INSTALL_DIR/.env" ]; then HTTPS_PORT="$(env_get HTTPS_PORT)"; HTTP_PORT="$(env_get HTTP_PORT)"; fi
@@ -445,6 +452,7 @@ main() {
 
   # The self-test only checks the AI provider selected under Configure > AI assistance (none on a fresh install).
   "$INSTALL_DIR/scripts/healthcheck.sh" --allow-no-model || die "post-install self-test failed"
+  prune_images "$VERSION"
 
   echo
   c_ok "Steward $VERSION is installed and running."

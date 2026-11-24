@@ -76,6 +76,52 @@ llm_pull_model() {
   compose exec -T ollama ollama pull "$model"
 }
 
+# ------------------------------------------------------------------ disk space
+
+FRESH_MIN_FREE_GB=20
+UPGRADE_MIN_FREE_GB=5
+
+docker_root() { docker info --format '{{.DockerRootDir}}' 2>/dev/null || echo /var/lib/docker; }
+
+# df_gb PATH [free|total]: whole GB.
+df_gb() {
+  local col=4
+  [ "${2:-free}" = total ] && col=2
+  echo $(( $(df -Pk "$1" | awk -v c="$col" 'NR==2 {print $c}') / 1024 / 1024 ))
+}
+
+# One line naming the largest users of the Docker disk, for failure messages.
+disk_hint() {
+  local df images volumes backups
+  df="$(docker system df --format '{{.Type}}|{{.Size}}' 2>/dev/null || true)"
+  images="$(awk -F'|' '$1 == "Images" {print $2}' <<<"$df")"
+  volumes="$(awk -F'|' '$1 == "Local Volumes" {print $2}' <<<"$df")"
+  backups="$(du -sh "$INSTALL_DIR/backups" 2>/dev/null | cut -f1)"
+  echo "Largest: images ${images:-?}, volumes ${volumes:-?}, backups ${backups:-?}. Free space with: docker image prune -a"
+}
+
+# prune_images KEEP...: remove Steward images of every other version, then dangling layers.
+# Other images on the host and all volumes are left alone; never fails.
+prune_images() {
+  local prefix ref keep removed=0 any=""
+  for keep in "$@"; do [ -n "$keep" ] && any=1; done
+  [ -n "$any" ] || return 0
+  prefix="$(env_get STEWARD_IMAGE_PREFIX)"
+  prefix="${prefix:-ghcr.io/mbechc/steward}"
+  while read -r ref; do
+    for keep in "$@"; do [ "${ref##*:}" = "$keep" ] && continue 2; done
+    if docker image rm "$ref" >/dev/null 2>&1; then
+      removed=$((removed + 1))
+    else
+      c_warn "could not remove image $ref (still in use?)"
+    fi
+  done < <(docker image ls --format '{{.Repository}}:{{.Tag}}' 2>/dev/null |
+    awk -v p="$prefix" '(index($0, p "-backend:") == 1 || index($0, p "-web:") == 1) && $0 !~ /:<none>$/')
+  docker image prune -f >/dev/null 2>&1 || true
+  if [ "$removed" -gt 0 ]; then c_ok "Removed $removed image(s) of earlier Steward versions"; fi
+  return 0
+}
+
 rand_hex() { head -c "${1:-32}" /dev/urandom | od -An -tx1 | tr -d ' \n'; }
 fernet_key() { head -c 32 /dev/urandom | base64 | tr '+/' '-_' | tr -d '\n'; }
 

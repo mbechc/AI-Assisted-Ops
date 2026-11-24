@@ -282,5 +282,6 @@ export interface UpdateState {
   pending: { action: string; age_seconds: number }[];
   updater_stale: boolean;
   updater_installed: boolean;
+  disk: { path: string; free_gb: number; total_gb: number } | null;
   can_manage: boolean;
 }

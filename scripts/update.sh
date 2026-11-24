@@ -29,7 +29,7 @@ trap 'rm -f "$STEWARD_UPDATER_SELF"' EXIT
 require_root
 [ -f "$INSTALL_DIR/.env" ] || die "no installation found in $INSTALL_DIR"
 
-UPDATER_VERSION=1
+UPDATER_VERSION=2
 UPD="$INSTALL_DIR/data/update"
 REQ="$UPD/requests"
 REPO="$(env_get STEWARD_UPDATE_REPO)"; REPO="${REPO:-$GITHUB_REPO}"
@@ -80,8 +80,15 @@ version_gt() {
 }
 
 write_status() {
+  local root free total disk=null
+  root="$(docker_root)"
+  free="$(df_gb "$root" 2>/dev/null || true)"
+  total="$(df_gb "$root" total 2>/dev/null || true)"
+  if [ -n "$free" ] && [ -n "$total" ]; then
+    disk="{\"path\": $(jstr "$root"), \"free_gb\": $free, \"total_gb\": $total}"
+  fi
   write_file "$UPD/status.json" <<EOF
-{"updated_at": "$(now_iso)", "current_version": $(jstr "$(env_get STEWARD_VERSION)"), "channel": $(jstr "$(env_get STEWARD_UPDATE_CHANNEL)"), "repo": $(jstr "$REPO"), "updater_version": $UPDATER_VERSION}
+{"updated_at": "$(now_iso)", "current_version": $(jstr "$(env_get STEWARD_VERSION)"), "channel": $(jstr "$(env_get STEWARD_UPDATE_CHANNEL)"), "repo": $(jstr "$REPO"), "updater_version": $UPDATER_VERSION, "disk": $disk}
 EOF
 }
 
@@ -201,6 +208,17 @@ install_version() {
   install_state running "$v"
   : >"$UPD/update.log"
   chmod 644 "$UPD/update.log"
+  local root free msg
+  root="$(docker_root)"
+  prune_images "$cur" >>"$UPD/update.log" 2>&1
+  free="$(df_gb "$root")"
+  if [ "$free" -lt "$UPGRADE_MIN_FREE_GB" ]; then
+    msg="at least $UPGRADE_MIN_FREE_GB GB free disk in $root required for an upgrade (found $free GB). $(disk_hint)"
+    echo "$msg" >>"$UPD/update.log"
+    install_state failed "$v" "$msg"
+    write_status
+    return 1
+  fi
   work="$(mktemp -d)"
   pkg="steward-$v.tar.gz"
   base="https://github.com/$REPO/releases/download/v$v"

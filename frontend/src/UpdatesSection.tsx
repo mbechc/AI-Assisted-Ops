@@ -3,6 +3,9 @@ import { api, fmtDate } from "./api";
 import { ErrorLine, Modal, useAsync } from "./components";
 import { Connectivity, UpdateState } from "./types";
 
+const UPGRADE_MIN_FREE_GB = 5;
+const DISK_WARN_GB = 10;
+
 const TRACKS = [
   { key: "production", label: "Production", text: "Stable releases only." },
   { key: "development", label: "Development", text: "Every release, including pre-releases (YYYY.M.R-dev.N)." },
@@ -89,7 +92,24 @@ export default function UpdatesSection() {
         </span>
         <span className="k">Last release check</span>
         <span>{fmtDate(d.releases_checked_at)}{d.releases_error && <span className="small" style={{ color: "var(--bad)" }}> {d.releases_error}</span>}</span>
+        {d.disk && (
+          <>
+            <span className="k">Disk</span>
+            <span>{d.disk.free_gb} GB free of {d.disk.total_gb} GB <span className="muted small">({d.disk.path})</span></span>
+          </>
+        )}
       </div>
+      {d.disk && d.disk.free_gb < UPGRADE_MIN_FREE_GB && (
+        <div className="banner bad">
+          Only {d.disk.free_gb} GB free in {d.disk.path}: updates are refused below {UPGRADE_MIN_FREE_GB} GB (earlier Steward
+          images are removed first). Free space on the host, for example with <code>docker image prune -a</code>.
+        </div>
+      )}
+      {d.disk && d.disk.free_gb >= UPGRADE_MIN_FREE_GB && d.disk.free_gb < DISK_WARN_GB && (
+        <div className="banner warn">
+          Only {d.disk.free_gb} GB free in {d.disk.path}. Updates need {UPGRADE_MIN_FREE_GB} GB; the supported size is 100 GB.
+        </div>
+      )}
 
       <h3>Track</h3>
       <div className="levels">

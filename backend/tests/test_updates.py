@@ -153,3 +153,14 @@ def test_api_roles_and_install(upd):
         assert actions == ["update.install", "update.channel"]
     finally:
         app.dependency_overrides.clear()
+
+
+def test_state_disk_from_updater(upd):
+    from app.updates import state
+    write(upd, "status.json", {"channel": "production", "updater_version": 1})
+    assert state()["disk"] is None, "older updaters report no disk"
+    disk = {"path": "/var/lib/docker", "free_gb": 12, "total_gb": 30}
+    write(upd, "status.json", {"channel": "production", "updater_version": 2, "disk": disk})
+    assert state()["disk"] == disk
+    write(upd, "status.json", {"channel": "production", "updater_version": 2, "disk": None})
+    assert state()["disk"] is None
