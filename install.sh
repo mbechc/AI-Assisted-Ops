@@ -11,6 +11,8 @@ on_error() {
 }
 trap 'on_error "$LINENO" "$BASH_COMMAND"' ERR
 
+# The shell may still be in a folder that no longer exists (for example after uninstall.sh --purge).
+pwd -P >/dev/null 2>&1 || cd /
 SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # shellcheck source=scripts/lib.sh
 . "$SRC_DIR/scripts/lib.sh"
@@ -323,6 +325,8 @@ build_images() {
 # Prebuilt images from ghcr.io; on upgrades only changed layers are downloaded.
 pull_images() {
   c_info "Pulling Steward $VERSION images ($(env_get STEWARD_IMAGE_PREFIX)-backend, -web) and base images"
+  local err
+  err="$(compose config --quiet 2>&1)" || die "cannot read $INSTALL_DIR/docker-compose.yml: $(tail -1 <<<"$err")"
   compose pull --quiet || die "image pull failed: check Internet/proxy access to ghcr.io (or use --build)"
 }
 

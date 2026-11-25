@@ -3,6 +3,8 @@
 # idempotent installer, which keeps configuration, certificates, data, model and users.
 # Accepts the same options as install.sh.
 set -euo pipefail
+# The shell may still be in a folder that no longer exists (for example after uninstall.sh --purge).
+pwd -P >/dev/null 2>&1 || cd /
 SRC_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 . "$SRC_DIR/scripts/lib.sh"
 require_root

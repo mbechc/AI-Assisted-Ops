@@ -36,6 +36,7 @@ EOF
 
 # Everything runs from main, so bash has read the whole script before it starts (curl | bash).
 main() {
+  pwd -P >/dev/null 2>&1 || cd /  # the current folder may have been deleted (uninstall.sh --purge)
   while [ $# -gt 0 ]; do
     case "$1" in
       --dir) DIR="$2"; shift 2 ;;
